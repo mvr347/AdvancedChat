@@ -1,0 +1,60 @@
+name: AdvancedChat
+version: "2.0"
+main: me.lovelace.advancedChat.AdvancedChat
+api-version: "1.21"
+softdepend: [PlaceholderAPI, CMI, ProtocolLib]
+libraries:
+  - "com.github.ben-manes.caffeine:caffeine:3.1.8"
+commands:
+  ach:
+    description: Основная команда плагина
+  channel:
+    description: Переключить канал чата
+    aliases: [ ch, c ]
+  ignorechat:
+    description: Игнорировать игрока
+    aliases: [ ignore ]
+  messagedelete:
+    description: Удалить сообщение
+    aliases: [ md ]
+  messageedit:
+    description: Редактировать сообщение
+    aliases: [ medit ]
+  silent:
+    description: Включить/выключить тихий режим
+  chatclear:
+    description: Очистка чата
+    aliases: [ cc ]
+  tagtoggle:
+    description: Включить/выключить упоминания себя
+  spy:
+    description: Режим шпиона
+permissions:
+  advancedchat.admin:
+    default: op
+  advancedchat.use:
+    default: true
+  advancedchat.delete.own:
+    default: true
+  advancedchat.delete.admin:
+    default: op
+  advancedchat.mention:
+    default: true
+  advancedchat.mention.everyone:
+    default: op
+  advancedchat.mention.everyone.bypass:
+    default: op
+  advancedchat.links:
+    default: true
+  advancedchat.color:
+    default: true
+  advancedchat.silent:
+    default: true
+  advancedchat.tagtoggle:
+    default: op
+  advancedchat.spy:
+    default: op
+  advancedchat.clear.global:
+    default: op
+  advancedchat.clear.console:
+    default: op

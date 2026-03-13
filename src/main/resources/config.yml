@@ -1,0 +1,215 @@
+# ========================================== #
+#          AdvancedChat Configuration        #
+# ========================================== #
+# Основной конфигурационный файл плагина AdvancedChat
+# Все изменения вступают в силу после /reload или перезагрузки сервера
+
+# ------------------------------------------ #
+#            Основные настройки чата         #
+# ------------------------------------------ #
+chat:
+  # Формат сообщения по умолчанию (поддерживает MiniMessage)
+  # Доступные плейсхолдеры: <player>, <message>
+  default-format: "<hover:show_text:'<gray>Кликни для /msg <player>'><click:suggest_command:'/msg <player> '><player></click></hover>: <gradient:#FFAA00:#FF0000><message></gradient>"
+  # Формат имени игрока с головой (используйте <head> или <h> для вставки головы)
+  # Примеры: "<head> <player>", "<h><player>", "<player>" (без головы)
+  player-format: "<head> <player>"
+  # Включить JSON-форматирование сообщений (для продвинутых форматов)
+  chat-json: true
+  # Разрешение для использования JSON-форматов
+  permission: "advancedchat.json"
+
+# ------------------------------------------ #
+#            Настройки цветов и форматов     #
+# ------------------------------------------ #
+colors:
+  # Автоматическое продолжение цвета в следующих строках
+  auto-continue: true
+  # Поддержка градиентов в сообщениях
+  gradient-support: true
+
+  # Настройки hover и click событий
+  hover:
+    # Включить hover-эффекты
+    enable: true
+    # Текст при наведении на имя игрока (поддерживает PAPI плейсхолдеры)
+    player-hover: "<gray>Убийств: %statistic_player_kills%\nКликни для информации!</gray>"
+    # Включить клик по имени игрока
+    player-click: true
+    # Включить JSON-клик события
+    enable-json: true
+    # Команда при клике на имя игрока ({player} будет заменено)
+    click-command:
+      - "/msg {player} 1"
+
+  # ------------------------------------------ #
+  #            Каналы чата                    #
+  # ------------------------------------------ #
+  # Каждый канал имеет свой префикс, радиус и формат
+  channels:
+    # Локальный чат (без префикса)
+    local:
+      prefix: ""  # Префикс для активации канала (пустой = без префикса)
+      radius: 200  # Радиус чата в блоках (-1 = глобальный)
+      format: "<gray>[L] </gray><hover:show_text:'<gray>Кликни для /msg <player>'><click:suggest_command:'/msg <player> '><player></click></hover>: <white><message></white>"
+      permission: "advancedchat.local"  # Разрешение для использования канала
+      command:  # Команды для переключения на канал
+        - local
+        - local chat
+    # Глобальный чат (префикс !)
+    global:
+      prefix: "!"  # Префикс для активации (!сообщение)
+      radius: -1  # -1 = без ограничений расстояния
+      format: "<yellow>[G] </yellow><hover:show_text:'<gray>Кликни для /msg <player>'><click:suggest_command:'/msg <player> '><player></click></hover>: <gradient:#FFAA00:#FF0000><message></gradient>"
+      permission: "advancedchat.global"
+      command:
+        - global
+        - global chat
+    # Административный чат (префикс adm)
+    admin:
+      prefix: "adm"
+      radius: -1
+      format: "<red>[A] </red><hover:show_text:'<red>Администратор'><player></hover>: <red><message></red>"
+      permission: "advancedchat.admin"
+      command:
+        - adm
+
+# ------------------------------------------ #
+#            Удаление сообщений              #
+# ------------------------------------------ #
+messagedelete:
+  # Включить удаление сообщений
+  enabled: true
+  # Префикс для кнопки удаления
+  prefix: "<dark_gray>[<red>x</red>]</dark_gray> "
+  # Полное удаление (true = без следа, false = замена на replacement-text)
+  full-delete: false
+  # Текст замены при удалении
+  replacement-text: "<gray><i>Сообщение было удалено</i></gray>"
+
+# ------------------------------------------ #
+#            Игнор и личные сообщения        #
+# ------------------------------------------ #
+ignore:
+  # Включить систему игнора
+  enabled: true
+  # Администраторы обходят игнор
+  admins-bypass: true
+
+# ------------------------------------------ #
+#            Упоминания (@player)            #
+# ------------------------------------------ #
+mentions:
+  # Включить систему упоминаний
+  enabled: true
+  # Кулдаун на @everyone в секундах (300 = 5 минут)
+  everyone-cooldown: 300
+  # Алиасы для упоминания всех игроков
+  everyone-aliases: ["everyone", "all", "here", "все", "всем"]
+  # Формат упоминания конкретного игрока
+  format: "<gradient:#00FF00:#00AA00><b>@%player%</b></gradient>"
+  # Звук при упоминании
+  sound: "ENTITY_EXPERIENCE_ORB_PICKUP"
+  # Разрешение для упоминания игроков
+  permission-mention: "advancedchat.mention"
+
+# ------------------------------------------ #
+#            Ссылки в чате                   #
+# ------------------------------------------ #
+links:
+  # Включить авто-обнаружение ссылок
+  enabled: true
+  # Формат отображения ссылки (%link% = оригинал, %url% = для клика)
+  format: "<hover:show_text:'<gray>Нажмите для перехода:<br><white>%link%</white>'><click:open_url:'%url%'><aqua><b>[Ссылка]</b></aqua></click></hover>"
+  # Разрешение для отправки ссылок
+  permission: "advancedchat.links"
+
+# ------------------------------------------ #
+#            База данных                     #
+# ------------------------------------------ #
+database:
+  # Включить базу данных для хранения сообщений
+  enabled: true
+  # Имя файла базы данных (в plugins/AdvancedChat/)
+  file: "chat.db"
+  # Включить статистику игроков
+  player-stats: true
+  # Включить пользовательские настройки
+  custom-settings: true
+
+# ------------------------------------------ #
+#            Уведомления администрации       #
+# ------------------------------------------ #
+staff-notifications:
+  # Включить уведомления для администрации
+  enabled: true
+  # Ключевые слова для активации уведомления
+  keywords: ["admin", "help", "staff", "админ", "админы"]
+  # Кулдаун между уведомлениями в секундах
+  cooldown: 60
+  # Разрешение для получения уведомлений
+  permission-receive: "advancedchat.staff.receive"
+  # Формат уведомления
+  format: "<red>[Внимание]</red> <yellow>Игрок <player> просит помощи:</yellow> <gray><message></gray>"
+  # Звук уведомления
+  sound: "BLOCK_NOTE_BLOCK_PLING"
+
+# ------------------------------------------ #
+#            Редактирование сообщений        #
+# ------------------------------------------ #
+messageedit:
+  # Включить редактирование сообщений
+  enabled: true
+  # Префикс для кнопки редактирования
+  prefix: "<yellow>[✎]</yellow> "
+  # Приписка к измененному сообщению
+  mark: " <dark_gray><i>(изм.)</i></dark_gray>"
+
+# ------------------------------------------ #
+#            ChatBubbles (голограммы)        #
+# ------------------------------------------ #
+# Голограммы над головой игрока при сообщении в чат
+chatbubbles:
+  # Включить ChatBubbles
+  enabled: true
+  # Время отображения голограммы в тиках (20 тиков = 1 секунда, 60 = 3 секунды)
+  display-time: 60
+  # Высота над головой игрока (в блоках)
+  height: 2.5
+  # Смещение головы игрока относительно текста (X, Y, Z)
+  head-offset-x: 0
+  head-offset-y: 0.3
+  head-offset-z: -0.3
+  # Показывать голову игрока рядом с сообщением
+  show-player-head: true
+  # Поддержка скинов из CMI (если игрок использовал /skin)
+  # true = голова будет с текстурой скина из CMI
+  # false = стандартная голова игрока
+  cmi-skins: true
+  # Формат сообщения в голограмме (поддерживает MiniMessage и градиенты)
+  # Плейсхолдер: <message>
+  format: "<gradient:#00FF00:#00AA00><message></gradient>"
+  # Радиус видимости голограммы (-1 = всем игрокам)
+  radius: 50
+  # Максимальная длина сообщения (обрезается если длиннее)
+  max-length: 100
+  # Анимация появления (fade-in в тиках)
+  fade-in: 5
+  # Анимация исчезновения (fade-out в тиках)
+  fade-out: 10
+  # Показывать префикс канала в голограмме
+  show-channel-prefix: true
+  # Частицы вокруг голограммы (опционально)
+  particles:
+    # Включить частицы
+    enabled: false
+    # Тип частиц (HAPPY_VILLAGER, HEART, SMOKE_NORMAL, и т.д.)
+    type: "HAPPY_VILLAGER"
+    # Количество частиц за спавн
+    count: 5
+    # Разброс частиц по осям X, Y, Z
+    offset-x: 0.3
+    offset-y: 0.1
+    offset-z: 0.3
+    # Скорость частиц
+    speed: 0.01
