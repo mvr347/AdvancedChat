@@ -1,215 +1,484 @@
 # ========================================== #
-#          AdvancedChat Configuration        #
+#       AdvancedChat Configuration           #
+#          Version 2.6                       #
 # ========================================== #
-# Основной конфигурационный файл плагина AdvancedChat
-# Все изменения вступают в силу после /reload или перезагрузки сервера
+# Основные настройки плагина
+# Текстовые сообщения находятся в messages.yml
+# ========================================== #
 
-# ------------------------------------------ #
-#            Основные настройки чата         #
-# ------------------------------------------ #
+# ========================================== #
+#           ОБЩИЕ НАСТРОЙКИ                  #
+# ========================================== #
+general:
+  # Включить плагин
+  enabled: true
+  # Режим отладки (логи в консоль)
+  debug: false
+
+# ========================================== #
+#           НАСТРОЙКИ ЧАТА                   #
+# ========================================== #
 chat:
-  # Формат сообщения по умолчанию (поддерживает MiniMessage)
-  # Доступные плейсхолдеры: <player>, <message>
-  default-format: "<hover:show_text:'<gray>Кликни для /msg <player>'><click:suggest_command:'/msg <player> '><player></click></hover>: <gradient:#FFAA00:#FF0000><message></gradient>"
-  # Формат имени игрока с головой (используйте <head> или <h> для вставки головы)
-  # Примеры: "<head> <player>", "<h><player>", "<player>" (без головы)
-  player-format: "<head> <player>"
-  # Включить JSON-форматирование сообщений (для продвинутых форматов)
+  # Формат сообщения по умолчанию
+  # <player> - имя игрока с головой, hover и click
+  # <delete_edit_buttons> - кнопки удаления/редактирования
+  default-format: "<delete_edit_buttons><hover:show_text:'<gray>Кликни для /msg <player>'><click:suggest_command:'/msg <player> '><player></click></hover>: <gradient:#FFAA00:#FF0000><message></gradient>"
+  # Формат для player-format (используется в некоторых местах)
+  player-format: "<player>"
+  # Отправлять сообщения в JSON формате (для продвинутого форматирования)
   chat-json: true
-  # Разрешение для использования JSON-форматов
+  # Разрешение для использования JSON формата
   permission: "advancedchat.json"
+  # Максимальная длина сообщения
+  max-length: 256
+  # Минимальная задержка между сообщениями (в секундах, 0 = отключено)
+  cooldown: 0
+  # Сообщение при превышении cooldown
+  cooldown-message: "<red>Подождите <yellow>{time}</yellow> сек. перед следующим сообщением!</red>"
+  # Блокировка сообщений в консоль
+  log-to-console: true
+  # Формат логирования в консоль
+  log-format: "[CHAT] <%player%> %message%"
 
-# ------------------------------------------ #
-#            Настройки цветов и форматов     #
-# ------------------------------------------ #
+# ========================================== #
+#         НАСТРОЙКИ ОТОБРАЖЕНИЯ              #
+# ========================================== #
 colors:
-  # Автоматическое продолжение цвета в следующих строках
+  # Автоматически продолжать градиенты
   auto-continue: true
-  # Поддержка градиентов в сообщениях
+  # Поддержка градиентов
   gradient-support: true
-
-  # Настройки hover и click событий
+  # Разрешение для использования цветов
+  color-permission: "advancedchat.color"
+  # Разрешение для использования градиентов
+  gradient-permission: "advancedchat.gradient"
+  # Разрешение для использования форматов
+  format-permission: "advancedchat.format"
+  # Hover эффекты при наведении на имя игрока
   hover:
-    # Включить hover-эффекты
     enable: true
-    # Текст при наведении на имя игрока (поддерживает PAPI плейсхолдеры)
+    # Текст при наведении (поддерживает PlaceholderAPI)
     player-hover: "<gray>Убийств: %statistic_player_kills%\nКликни для информации!</gray>"
     # Включить клик по имени игрока
     player-click: true
-    # Включить JSON-клик события
+    # Включить JSON форматирование
     enable-json: true
-    # Команда при клике на имя игрока ({player} будет заменено)
+    # Команды при клике
     click-command:
       - "/msg {player} 1"
-
-  # ------------------------------------------ #
-  #            Каналы чата                    #
-  # ------------------------------------------ #
-  # Каждый канал имеет свой префикс, радиус и формат
+  # Каналы чата
   channels:
-    # Локальный чат (без префикса)
     local:
-      prefix: ""  # Префикс для активации канала (пустой = без префикса)
-      radius: 200  # Радиус чата в блоках (-1 = глобальный)
-      format: "<gray>[L] </gray><hover:show_text:'<gray>Кликни для /msg <player>'><click:suggest_command:'/msg <player> '><player></click></hover>: <white><message></white>"
-      permission: "advancedchat.local"  # Разрешение для использования канала
-      command:  # Команды для переключения на канал
+      prefix: ""
+      radius: 200
+      format: "<delete_edit_buttons><gray>[L] </gray><hover:show_text:'<gray>Кликни для /msg %player_name%'><click:suggest_command:'/msg %player_name% '><player></click></hover>: <white><message></white>"
+      permission: "advancedchat.local"
+      command:
         - local
         - local chat
-    # Глобальный чат (префикс !)
+      # Отдельный cooldown для канала (в секундах)
+      cooldown: 0
+      # Максимум сообщений в минуту (-1 = без ограничений)
+      max-per-minute: -1
     global:
-      prefix: "!"  # Префикс для активации (!сообщение)
-      radius: -1  # -1 = без ограничений расстояния
-      format: "<yellow>[G] </yellow><hover:show_text:'<gray>Кликни для /msg <player>'><click:suggest_command:'/msg <player> '><player></click></hover>: <gradient:#FFAA00:#FF0000><message></gradient>"
+      prefix: "!"
+      radius: -1
+      format: "<delete_edit_buttons><yellow>[G] </yellow><hover:show_text:'<gray>Кликни для /msg %player_name%'><click:suggest_command:'/msg %player_name% '><player></click></hover>: <gradient:#FFAA00:#FF0000><message></gradient>"
       permission: "advancedchat.global"
       command:
         - global
         - global chat
-    # Административный чат (префикс adm)
+      cooldown: 0
+      max-per-minute: -1
     admin:
       prefix: "adm"
       radius: -1
-      format: "<red>[A] </red><hover:show_text:'<red>Администратор'><player></hover>: <red><message></red>"
+      format: "<delete_edit_buttons><red>[A] </red><hover:show_text:'<red>Администратор'><click:suggest_command:'/msg %player_name% '><player></click></hover>: <red><message></red>"
       permission: "advancedchat.admin"
       command:
         - adm
+      cooldown: 0
+      max-per-minute: -1
+    # Пример дополнительного канала
+    #vip:
+    #  prefix: "$"
+    #  radius: -1
+    #  format: "<delete_edit_buttons><gold>[VIP] </gold><hover:show_text:'<gray>Кликни для /msg <player>'><click:suggest_command:'/msg <player> '><head:player:player></click></hover>: <gold><message></gold>"
+    #  permission: "advancedchat.vip"
+    #  command:
+    #    - vip
+    #  cooldown: 0
+    #  min-level: 0
+    #  max-per-minute: 30
 
-# ------------------------------------------ #
-#            Удаление сообщений              #
-# ------------------------------------------ #
+# ========================================== #
+#      УДАЛЕНИЕ СООБЩЕНИЙ                    #
+# ========================================== #
 messagedelete:
-  # Включить удаление сообщений
   enabled: true
-  # Префикс для кнопки удаления
-  prefix: "<dark_gray>[<red>x</red>]</dark_gray> "
-  # Полное удаление (true = без следа, false = замена на replacement-text)
+  prefix: "<dark_gray>[<red>x</red>]</dark_gray>"
+  # Полное удаление (замена текста вместо удаления)
   full-delete: false
-  # Текст замены при удалении
+  # Текст замены при полном удалении
   replacement-text: "<gray><i>Сообщение было удалено</i></gray>"
+  # Разрешение для удаления своих сообщений
+  delete-permission: "advancedchat.delete"
+  # Разрешение для удаления чужих сообщений
+  delete-others-permission: "advancedchat.delete.others"
+  # Время для удаления своих сообщений (в секундах, 0 = без ограничений)
+  delete-time-limit: 0
+  # Удалять сообщения из базы данных
+  delete-from-database: true
 
-# ------------------------------------------ #
-#            Игнор и личные сообщения        #
-# ------------------------------------------ #
+# ========================================== #
+#      РЕДАКТИРОВАНИЕ СООБЩЕНИЙ              #
+# ========================================== #
+messageedit:
+  enabled: true
+  prefix: "<yellow>[✎]</yellow>"
+  # Метка отредактированного сообщения
+  mark: " <dark_gray><i>(изм.)</i></dark_gray>"
+  # Разрешение для редактирования своих сообщений
+  edit-permission: "advancedchat.edit"
+  # Разрешение для редактирования чужих сообщений
+  edit-others-permission: "advancedchat.edit.others"
+  # Время для редактирования (в секундах, 0 = без ограничений)
+  edit-time-limit: 300
+  # Максимум редактирований одного сообщения
+  max-edits: 5
+  # Сохранять историю редактирований
+  save-history: true
+  # Максимум записей в истории
+  max-history: 10
+
+# ========================================== #
+#         ИГНОР ЛИСТ                          #
+# ========================================== #
 ignore:
-  # Включить систему игнора
   enabled: true
-  # Администраторы обходят игнор
+  # Админы обходят игнор
   admins-bypass: true
+  # Разрешение для обхода игнора
+  bypass-permission: "advancedchat.ignore.bypass"
+  # Максимум игроков в игнор-листе
+  max-ignored: 50
+  # Показывать сообщение при попытке написать игнорируемому
+  show-message: true
+  # Сообщение при игноре
+  ignore-message: "<gray>Игрок игнорирует вас.</gray>"
 
-# ------------------------------------------ #
-#            Упоминания (@player)            #
-# ------------------------------------------ #
+# ========================================== #
+#      УПОМИНАНИЯ (MENTIONS)                 #
+# ========================================== #
 mentions:
-  # Включить систему упоминаний
   enabled: true
-  # Кулдаун на @everyone в секундах (300 = 5 минут)
+  # Кулдаун для @everyone (в секундах)
   everyone-cooldown: 300
-  # Алиасы для упоминания всех игроков
+  # Алиасы для @everyone
   everyone-aliases: ["everyone", "all", "here", "все", "всем"]
-  # Формат упоминания конкретного игрока
+  # Разрешение для использования @everyone
+  everyone-permission: "advancedchat.mention.everyone"
+  # Разрешение для обхода кулдауна @everyone
+  everyone-bypass-permission: "advancedchat.mention.everyone.bypass"
+  # Формат упоминания для других игроков
   format: "<gradient:#00FF00:#00AA00><b>@%player%</b></gradient>"
-  # Звук при упоминании
+  # Формат упоминания для цели
+  format-target: "<yellow><b>%player%</b></yellow>"
+  # Формат упоминания для остальных
+  format-others: "<green>%player%</green>"
+  # Звук при упоминании (или "NONE" для отключения)
   sound: "ENTITY_EXPERIENCE_ORB_PICKUP"
-  # Разрешение для упоминания игроков
+  # Громкость звука
+  sound-volume: 1.0
+  # Высота звука
+  sound-pitch: 1.0
+  # Сообщение в Action Bar
+  actionbar:
+    enabled: true
+    text: "<gold>Вас упомянули в чате!</gold>"
+  # Разрешение для упоминаний
   permission-mention: "advancedchat.mention"
+  # Блокировать упоминания оффлайн игроков
+  block-offline: false
+  # Максимум упоминаний в одном сообщении
+  max-mentions: 5
 
-# ------------------------------------------ #
-#            Ссылки в чате                   #
-# ------------------------------------------ #
+# ========================================== #
+#         ССЫЛКИ                              #
+# ========================================== #
 links:
-  # Включить авто-обнаружение ссылок
   enabled: true
-  # Формат отображения ссылки (%link% = оригинал, %url% = для клика)
   format: "<hover:show_text:'<gray>Нажмите для перехода:<br><white>%link%</white>'><click:open_url:'%url%'><aqua><b>[Ссылка]</b></aqua></click></hover>"
-  # Разрешение для отправки ссылок
   permission: "advancedchat.links"
+  # Разрешение для отправки ссылок
+  send-permission: "advancedchat.links.send"
+  # Блокировать ссылки для игроков без разрешения
+  block-without-permission: false
+  # Сообщение при блокировке ссылки
+  block-message: "<red>У вас нет прав для отправки ссылок!</red>"
+  # Авто-сокращение длинных ссылок
+  auto-shorten: false
+  # Максимальная длина ссылки перед сокращением
+  shorten-length: 50
+  # Чёрный список доменов
+  blacklisted-domains: ["spam.com", "virus.com"]
+  # Белый список доменов (если включён whitelist-mode)
+  whitelisted-domains: ["youtube.com", "twitch.tv"]
+  # Режим белого списка
+  whitelist-mode: false
 
-# ------------------------------------------ #
-#            База данных                     #
-# ------------------------------------------ #
+# ========================================== #
+#         БАЗА ДАННЫХ                         #
+# ========================================== #
 database:
-  # Включить базу данных для хранения сообщений
   enabled: true
-  # Имя файла базы данных (в plugins/AdvancedChat/)
   file: "chat.db"
-  # Включить статистику игроков
+  # Тип базы данных (sqlite)
+  type: "sqlite"
+  # Статистика игроков
   player-stats: true
-  # Включить пользовательские настройки
+  # Пользовательские настройки
   custom-settings: true
+  # Авто-сохранение (в секундах)
+  auto-save: 300
+  # Резервное копирование БД
+  backup:
+    enabled: true
+    # Интервал резервного копирования (в часах)
+    interval: 24
+    # Максимум резервных копий
+    max-backups: 10
 
-# ------------------------------------------ #
-#            Уведомления администрации       #
-# ------------------------------------------ #
+# ========================================== #
+#      УВЕДОМЛЕНИЯ ПЕРСОНАЛУ                 #
+# ========================================== #
 staff-notifications:
-  # Включить уведомления для администрации
   enabled: true
-  # Ключевые слова для активации уведомления
+  # Ключевые слова для уведомлений
   keywords: ["admin", "help", "staff", "админ", "админы"]
-  # Кулдаун между уведомлениями в секундах
+  # Кулдаун между уведомлениями (в секундах)
   cooldown: 60
   # Разрешение для получения уведомлений
   permission-receive: "advancedchat.staff.receive"
+  # Разрешение для отправки уведомлений
+  permission-send: "advancedchat.staff.notify"
   # Формат уведомления
   format: "<red>[Внимание]</red> <yellow>Игрок <player> просит помощи:</yellow> <gray><message></gray>"
   # Звук уведомления
   sound: "BLOCK_NOTE_BLOCK_PLING"
+  # Громкость звука
+  sound-volume: 1.0
+  # Показывать в Action Bar
+  actionbar:
+    enabled: true
+    text: "<red>Внимание!</red> <yellow>Игрок просит помощи!</yellow>"
 
-# ------------------------------------------ #
-#            Редактирование сообщений        #
-# ------------------------------------------ #
-messageedit:
-  # Включить редактирование сообщений
-  enabled: true
-  # Префикс для кнопки редактирования
-  prefix: "<yellow>[✎]</yellow> "
-  # Приписка к измененному сообщению
-  mark: " <dark_gray><i>(изм.)</i></dark_gray>"
-
-# ------------------------------------------ #
-#            ChatBubbles (голограммы)        #
-# ------------------------------------------ #
-# Голограммы над головой игрока при сообщении в чат
+# ========================================== #
+#        CHAT BUBBLES (голограммы)           #
+# ========================================== #
 chatbubbles:
-  # Включить ChatBubbles
   enabled: true
-  # Время отображения голограммы в тиках (20 тиков = 1 секунда, 60 = 3 секунды)
+  # Время отображения (в тиках, 20 тиков = 1 секунда)
   display-time: 60
-  # Высота над головой игрока (в блоках)
-  height: 2.5
-  # Смещение головы игрока относительно текста (X, Y, Z)
-  head-offset-x: 0
-  head-offset-y: 0.3
-  head-offset-z: -0.3
-  # Показывать голову игрока рядом с сообщением
-  show-player-head: true
-  # Поддержка скинов из CMI (если игрок использовал /skin)
-  # true = голова будет с текстурой скина из CMI
-  # false = стандартная голова игрока
-  cmi-skins: true
-  # Формат сообщения в голограмме (поддерживает MiniMessage и градиенты)
-  # Плейсхолдер: <message>
+  # Высота над головой игрока
+  height: 1.8
+  # Радиус проверки игроков nearby
+  check-radius: 40
+  # Формат сообщения в bubble
   format: "<gradient:#00FF00:#00AA00><message></gradient>"
-  # Радиус видимости голограммы (-1 = всем игрокам)
+  # Радиус видимости bubble
   radius: 50
-  # Максимальная длина сообщения (обрезается если длиннее)
+  # Максимальная длина сообщения
   max-length: 100
-  # Анимация появления (fade-in в тиках)
-  fade-in: 5
-  # Анимация исчезновения (fade-out в тиках)
-  fade-out: 10
-  # Показывать префикс канала в голограмме
-  show-channel-prefix: true
-  # Частицы вокруг голограммы (опционально)
-  particles:
-    # Включить частицы
+  # Каналы, для которых разрешены bubble
+  allowed-channels:
+    - local
+    - global
+  # Показывать префикс канала
+  show-channel-prefix: false
+  # Разрешение для использования chatbubbles
+  permission: "advancedchat.chatbubbles"
+  # Скрывать от игроков в режиме silent
+  hide-from-silent: true
+  # Анимация появления
+  animation:
+    enabled: true
+    # Тип анимации (fade, slide, scale)
+    type: "fade"
+    # Длительность анимации (в тиках)
+    duration: 10
+  # Ограничения
+  limits:
+    # Минимальный уровень
+    min-level: 0
+    # Кулдаун между bubble (в секундах)
+    cooldown: 5
+
+# ========================================== #
+#     PINNED MESSAGES (в чате)               #
+# ========================================== #
+pinned-messages:
+  enabled: true
+  # Максимум закреплённых сообщений
+  max-pinned: 1
+  # Формат закреплённого сообщения
+  format: "<bold><gold>[ЗАКРЕПЛЕНО]</gold></bold> <white><message></white>"
+  # Разрешение для закрепления
+  pin-permission: "advancedchat.pin"
+  # Разрешение для обхода лимита
+  bypass-limit-permission: "advancedchat.pin.bypass-limit"
+  # Разрешение для админ-закрепления
+  admin-permission: "advancedchat.pin.admin"
+  # Настройки BossBar
+  bossbar:
+    color: "BLUE"
+    overlay: "NOTCHED_10"
+    # Показывать прогресс на BossBar
+    show-progress: true
+  # Авто-закрепление
+  auto-pin:
     enabled: false
-    # Тип частиц (HAPPY_VILLAGER, HEART, SMOKE_NORMAL, и т.д.)
-    type: "HAPPY_VILLAGER"
-    # Количество частиц за спавн
-    count: 5
-    # Разброс частиц по осям X, Y, Z
-    offset-x: 0.3
-    offset-y: 0.1
-    offset-z: 0.3
-    # Скорость частиц
-    speed: 0.01
+    keywords: ["alert", "warning", "announcement", "server", "ban", "тревога", "важно"]
+    duration: 60
+    # Разрешение для авто-закрепления
+    permission: "advancedchat.pin.auto"
+  # Уведомление о закреплении
+  notifications:
+    enabled: true
+    format: "<gold>Сообщение закреплено!</gold>"
+  # Время до истечения (в секундах, 0 = навсегда)
+  default-duration: 0
+  # Показывать время до истечения
+  show-timer: true
+
+# ========================================== #
+#           POLL SYSTEM                      #
+# ========================================== #
+polls:
+  enabled: true
+  # Максимум вариантов в голосовании
+  max-options: 6
+  # Максимум активных голосований
+  max-active-polls: 1
+  # Длительность по умолчанию (в секундах)
+  default-duration: 300
+  # Кулдаун между созданиями (в секундах)
+  cooldown: 60
+  # Разрешение для создания голосований
+  create-permission: "advancedchat.poll.create"
+  # Разрешение для голосования
+  vote-permission: "advancedchat.poll.vote"
+  # Разрешение для обхода лимита
+  bypass-limit-permission: "advancedchat.poll.bypass-limit"
+  # Разрешение для обхода кулдауна
+  bypass-cooldown-permission: "advancedchat.poll.bypass-cooldown"
+  # Разрешение для завершения голосований
+  end-permission: "advancedchat.poll.end"
+  # Разрешение для просмотра результатов
+  results-permission: "advancedchat.poll.results"
+  # Форматы
+  formats:
+    # Формат вопроса
+    question: "<dark_gray>========== <aqua>Голосование #{id}</aqua> ==========</dark_gray><newline><white><b><question></b></white>"
+    # Формат варианта
+    option: "<gray>{index}. </gray><white><option></white> <dark_gray>- <hover:show_text:'<green>Голосовать</green>'><click:run_command:'/poll vote {id} {index}'><aqua>[Голосовать]</aqua></click></hover></dark_gray>"
+    # Формат результатов
+    results: "<dark_gray>========== <aqua>Результаты голосования #{id}</aqua> ==========</dark_gray><newline><white><b><question></b></white><newline><total_votes> голос(ов)</total_votes>"
+    # Формат варианта в результатах
+    result-option: "<gray>{index}. </gray><white><option></white> <dark_gray>- <green><votes> голос(ов)</green></dark_gray>"
+    # Формат завершения
+    ended: "<dark_gray>========== <aqua>Голосование #{id} завершено</aqua> ==========</dark_gray>"
+  # Уведомления
+  notifications:
+    # Показывать уведомление при создании
+    on-create: true
+    # Показывать уведомление при завершении
+    on-end: true
+    # Звук при голосовании
+    vote-sound: "UI_BUTTON_CLICK"
+  # Авто-завершение
+  auto-end:
+    enabled: true
+    # Завершать когда все проголосовали
+    when-all-voted: false
+    # Минимальный процент игроков для авто-завершения
+    min-players-percent: 50
+
+# ========================================== #
+#      РЕЖИМЫ (SPY, SILENT, TAGS)            #
+# ========================================== #
+modes:
+  # Spy режим - видеть все каналы
+  spy:
+    enabled: true
+    permission: "advancedchat.spy"
+    # Формат сообщения в spy режиме
+    format: "<dark_gray>[SPY] </dark_gray>"
+    # Показывать в Action Bar
+    actionbar: true
+  # Silent режим - скрытый режим
+  silent:
+    enabled: true
+    permission: "advancedchat.silent"
+    # Блокировать упоминания в silent режиме
+    block-mentions: true
+    # Показывать сообщение при включении
+    notify: true
+  # Tag режим - отключение тегов
+  tags:
+    enabled: true
+    permission: "advancedchat.tagtoggle"
+    # Разрешение для управления тегами других
+    others-permission: "advancedchat.tagtoggle.others"
+
+# ========================================== #
+#      ИНТЕГРАЦИИ                            #
+# ========================================== #
+integrations:
+  # PlaceholderAPI
+  placeholderapi:
+    enabled: true
+    # Обновлять плейсхолдеры асинхронно
+    async: true
+  # CMI (для скинов)
+  cmi:
+    enabled: true
+    # Использовать скины из CMI
+    use-skins: true
+  # ProtocolLib
+  protocollib:
+    enabled: true
+
+# ========================================== #
+#      КОМАНДЫ                               #
+# ========================================== #
+commands:
+  # Префикс команд
+  prefix: "/chat"
+  # Алиасы команд
+  aliases:
+    ach: ["advancedchat", "achat"]
+    channel: ["ch", "c"]
+    ignore: ["ig"]
+    chatclear: ["cc", "clearchat"]
+  # Разрешения для команд
+  permissions:
+    reload: "advancedchat.admin"
+    clear: "advancedchat.clear"
+    pin: "advancedchat.pin"
+    poll: "advancedchat.poll"
+    spy: "advancedchat.spy"
+    silent: "advancedchat.silent"
+
+# ========================================== #
+#      ПРОИЗВОЛЬНОЕ                          #
+# ========================================== #
+# Настройки для кастомных каналов
+custom-channels:
+  enabled: true
+  # Максимум кастомных каналов
+  max-channels: 10
+  # Разрешение для создания каналов
+  create-permission: "advancedchat.channel.create"
+  # Разрешение для удаления каналов
+  delete-permission: "advancedchat.channel.delete"

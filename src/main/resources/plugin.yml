@@ -1,34 +1,43 @@
 name: AdvancedChat
-version: "2.0"
+version: "2.5"
 main: me.lovelace.advancedChat.AdvancedChat
-api-version: "1.21"
+api-version: '1.21.11'
 softdepend: [PlaceholderAPI, CMI, ProtocolLib]
 libraries:
   - "com.github.ben-manes.caffeine:caffeine:3.1.8"
 commands:
   ach:
-    description: Основная команда плагина
+    description: Основная команда плагия
+    aliases: [chat]
   channel:
     description: Переключить канал чата
-    aliases: [ ch, c ]
+    aliases: [ch, c]
   ignorechat:
     description: Игнорировать игрока
-    aliases: [ ignore ]
+    aliases: [ignore]
   messagedelete:
     description: Удалить сообщение
-    aliases: [ md ]
+    aliases: [md]
   messageedit:
     description: Редактировать сообщение
-    aliases: [ medit ]
+    aliases: [medit]
   silent:
     description: Включить/выключить тихий режим
   chatclear:
     description: Очистка чата
-    aliases: [ cc ]
+    aliases: [cc]
   tagtoggle:
     description: Включить/выключить упоминания себя
   spy:
     description: Режим шпиона
+  pin:
+    description: Закрепить сообщение или текст
+    usage: "/pin <text или #message-id> [duration in seconds]"
+    aliases: [pinned]
+  poll:
+    description: Система голосований в чате
+    usage: "/poll create <вопрос> | <opt1> | <opt2> | ... | <opt6>"
+    aliases: [vote]
 permissions:
   advancedchat.admin:
     default: op
@@ -58,3 +67,43 @@ permissions:
     default: op
   advancedchat.clear.console:
     default: op
+  chat.edit:
+    description: "Разрешает удалять и редактировать свои сообщения"
+    default: true
+  chat.edit.admin:
+    description: "Разрешает удалять и редактировать чужие сообщения"
+    default: op
+  # Pinned Messages permissions
+  advancedchat.pin.use:
+    default: true
+  advancedchat.pin.admin:
+    default: op
+  advancedchat.pin.bypass-limit:
+    default: op
+  advancedchat.pin.see:
+    default: true
+  advancedchat.pin.auto:
+    default: op
+  advancedchat.pin.bypass-duration:
+    default: op
+  # Poll System permissions
+  advancedchat.poll.create:
+    default: true
+  advancedchat.poll.vote:
+    default: true
+  advancedchat.poll.view:
+    default: true
+  advancedchat.poll.admin:
+    default: op
+  # Reactions permissions
+  advancedchat.reaction.use:
+    default: true
+  advancedchat.reaction.see:
+    default: true
+  advancedchat.reaction.admin:
+    default: op
+  # Quote/Reply permissions
+  advancedchat.quote.use:
+    default: true
+  advancedchat.quote.see:
+    default: true

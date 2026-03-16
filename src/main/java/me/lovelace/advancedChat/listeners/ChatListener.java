@@ -1,15 +1,20 @@
-package me.lovelace.advancedChat;
+package me.lovelace.advancedChat.listeners;
 
 import io.papermc.paper.event.player.AsyncChatEvent;
 import me.clip.placeholderapi.PlaceholderAPI;
+import me.lovelace.advancedChat.AdvancedChat;
+import me.lovelace.advancedChat.managers.ChatBubbleManager;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+import net.kyori.adventure.sound.Sound;
+import net.kyori.adventure.key.Key;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.Sound;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -17,36 +22,37 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
-import me.lovelace.advancedChat.api.events.AdvancedChatMessageEvent;
-import me.lovelace.advancedChat.api.events.AdvancedChatMentionEvent;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
+import me.lovelace.advancedChat.api.AdvancedChatAPI.AdvancedChatMessageEvent;
+import me.lovelace.advancedChat.api.AdvancedChatAPI.AdvancedChatMentionEvent;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-@SuppressWarnings("deprecation")
 public class ChatListener implements Listener {
     private final AdvancedChat plugin;
-    private final MiniMessage miniMessage = MiniMessage.miniMessage();
+    private final MiniMessage miniMessage;
     private final ChatBubbleManager chatBubbleManager;
 
-    // Паттерн для меток
     private final Pattern mentionPattern = Pattern.compile("(?i)@([a-zA-Z0-9_А-Яа-яЁё]+)");
-    // НОВОЕ: Умный паттерн для поиска любых ссылок (домен + зона + путь)
     private final Pattern linkPattern = Pattern.compile("(?i)\\b(?:https?://)?(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,}(?:/[^\\s<>\"]*)?\\b");
 
     private final Map<UUID, Long> staffCooldowns = new ConcurrentHashMap<>();
     private final Map<UUID, Long> everyoneCooldowns = new ConcurrentHashMap<>();
 
-    public ChatListener(AdvancedChat plugin) {
+    public ChatListener(@NotNull AdvancedChat plugin) {
         this.plugin = plugin;
+        this.miniMessage = MiniMessage.miniMessage();
         this.chatBubbleManager = plugin.getChatBubbleManager();
     }
 
     @EventHandler
-    public void onPlayerJoin(PlayerJoinEvent event) {
-        UUID uuid = event.getPlayer().getUniqueId();
+    public void onPlayerJoin(@NotNull PlayerJoinEvent event) {
+        Player player = event.getPlayer();
+        UUID uuid = player.getUniqueId();
         plugin.getDatabaseManager().getDefaultChannel(uuid).thenAccept(channel -> {
             if (channel != null) plugin.setDefaultChannel(uuid, channel);
         });
@@ -54,24 +60,39 @@ public class ChatListener implements Listener {
         plugin.getDatabaseManager().getTagsDisabled(uuid).thenAccept(disabled -> {
             if (disabled) plugin.setTagsDisabled(uuid, true);
         });
+
+        plugin.getPinnedMessageManager().showActiveBars(player);
     }
 
     @EventHandler
-    public void onPlayerQuit(PlayerQuitEvent event) {
+    public void onPlayerQuit(@NotNull PlayerQuitEvent event) {
         UUID uuid = event.getPlayer().getUniqueId();
+        plugin.removeEditSession(uuid);
         plugin.removeDefaultChannel(uuid);
         staffCooldowns.remove(uuid);
         everyoneCooldowns.remove(uuid);
         plugin.setTagsDisabled(uuid, false);
         if (plugin.isSpy(uuid)) plugin.toggleSpy(uuid);
-        // Удаляем голограмму при выходе
-        chatBubbleManager.removeBubblesForPlayer(uuid);
+        chatBubbleManager.removeBubble(uuid);
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    public void onModernChat(AsyncChatEvent event) {
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onModernChat(@NotNull AsyncChatEvent event) {
         Player player = event.getPlayer();
         String rawMessage = PlainTextComponentSerializer.plainText().serialize(event.message());
+
+        AdvancedChat.EditSession session = plugin.getEditSession(player.getUniqueId());
+        if (session != null) {
+            event.setCancelled(true);
+            if (rawMessage.equalsIgnoreCase("cancel")) {
+                plugin.removeEditSession(player.getUniqueId());
+                plugin.sendMessage(player, "edit-cancelled-click");
+                return;
+            }
+            plugin.editMessageVisual(session.messageId(), rawMessage, player);
+            plugin.removeEditSession(player.getUniqueId());
+            return;
+        }
 
         event.setCancelled(true);
         event.viewers().clear();
@@ -98,22 +119,22 @@ public class ChatListener implements Listener {
         activeChannel = apiEvent.getChannel();
 
         int radius = channels != null ? channels.getInt(activeChannel + ".radius", 200) : 200;
-        if (plugin.getCustomChannels().containsKey(activeChannel)) {
+        if (activeChannel != null && plugin.getCustomChannels().containsKey(activeChannel)) {
             radius = plugin.getCustomChannels().get(activeChannel);
         }
 
         String perm = channels != null ? channels.getString(activeChannel + ".permission", "NONE") : "NONE";
-        if (!perm.equalsIgnoreCase("NONE") && !player.hasPermission(perm) && !plugin.getCustomChannels().containsKey(activeChannel)) {
+        if (!perm.equalsIgnoreCase("NONE") && !player.hasPermission(perm) && (activeChannel == null || !plugin.getCustomChannels().containsKey(activeChannel))) {
             plugin.sendMessage(player, "no-permission-channel");
             return;
         }
 
         if (plugin.getConfig().getBoolean("staff-notifications.enabled", true)) {
             List<String> keywords = plugin.getConfig().getStringList("staff-notifications.keywords");
-            String lowerMessage = message.toLowerCase();
+            String lowerMessage = message.toLowerCase(Locale.ROOT);
 
             for (String kw : keywords) {
-                if (lowerMessage.contains(kw.toLowerCase())) {
+                if (lowerMessage.contains(kw.toLowerCase(Locale.ROOT))) {
                     long lastTime = staffCooldowns.getOrDefault(player.getUniqueId(), 0L);
                     int cd = plugin.getConfig().getInt("staff-notifications.cooldown", 60);
                     if (System.currentTimeMillis() - lastTime > cd * 1000L) {
@@ -124,12 +145,17 @@ public class ChatListener implements Listener {
                                 Placeholder.parsed("player", player.getName()),
                                 Placeholder.parsed("message", message)
                         );
-                        String soundName = plugin.getConfig().getString("staff-notifications.sound", "BLOCK_NOTE_BLOCK_PLING");
+
+                        String soundConfig1 = plugin.getConfig().getString("staff-notifications.sound");
+                        String soundNameStr = soundConfig1 != null ? soundConfig1 : "block.note_block.pling";
+                        Key soundKey1 = Key.key(soundNameStr.contains(":") ? soundNameStr : "minecraft:" + soundNameStr.toLowerCase(Locale.ROOT));
 
                         for (Player p : Bukkit.getOnlinePlayers()) {
                             if (p.hasPermission(plugin.getConfig().getString("staff-notifications.permission-receive", "advancedchat.staff.receive"))) {
                                 p.sendMessage(staffAlert);
-                                try { p.playSound(p.getLocation(), Sound.valueOf(soundName), 1f, 1f); } catch (Exception ignored) {}
+                                try {
+                                    p.playSound(Sound.sound(soundKey1, Sound.Source.MASTER, 1f, 1f));
+                                } catch (Exception ignored) {}
                             }
                         }
                     }
@@ -148,25 +174,23 @@ public class ChatListener implements Listener {
             try {
                 contentComponent = GsonComponentSerializer.gson().deserialize(message);
             } catch (Exception e) {
-                contentComponent = miniMessage.deserialize("<red>[Ошибка JSON формарования]</red> " + miniMessage.escapeTags(message));
+                contentComponent = miniMessage.deserialize("<red>[Ошибка JSON форматирования]</red> " + miniMessage.escapeTags(message));
             }
         } else {
             if (!player.hasPermission("advancedchat.color")) {
                 message = miniMessage.escapeTags(message);
             }
 
-            // НОВОЕ: ОБРАБОТКА ССЫЛОК ПЕРЕД ТЕГАМИ
             if (plugin.getConfig().getBoolean("links.enabled", true) && player.hasPermission(plugin.getConfig().getString("links.permission", "advancedchat.links"))) {
                 Matcher linkMatcher = linkPattern.matcher(message);
-                StringBuffer linkSb = new StringBuffer();
+                StringBuilder linkSb = new StringBuilder();
                 String linkFormat = plugin.getConfig().getString("links.format", "<hover:show_text:'<gray>Нажмите для перехода:<br><white>%link%</white>'><click:open_url:'%url%'><aqua><b>[Ссылка]</b></aqua></click></hover>");
 
                 while (linkMatcher.find()) {
                     String originalLink = linkMatcher.group();
                     String url = originalLink;
 
-                    // Если игрок написал просто discord.gg, подставляем https:// для кликабельности
-                    if (!url.toLowerCase().startsWith("http://") && !url.toLowerCase().startsWith("https://")) {
+                    if (!url.toLowerCase(Locale.ROOT).startsWith("http://") && !url.toLowerCase(Locale.ROOT).startsWith("https://")) {
                         url = "https://" + url;
                     }
 
@@ -177,10 +201,9 @@ public class ChatListener implements Listener {
                 message = linkSb.toString();
             }
 
-            // Обработка меток (упоминаний)
             if (plugin.getConfig().getBoolean("mentions.enabled", true)) {
                 Matcher m = mentionPattern.matcher(message);
-                StringBuffer sb = new StringBuffer();
+                StringBuilder sb = new StringBuilder();
 
                 List<String> everyoneAliases = plugin.getConfig().getStringList("mentions.everyone-aliases");
                 if (everyoneAliases.isEmpty()) {
@@ -233,7 +256,7 @@ public class ChatListener implements Listener {
 
                     if (target == null) {
                         for (Player p : Bukkit.getOnlinePlayers()) {
-                            if (p.getName().toLowerCase().startsWith(name.toLowerCase())) {
+                            if (p.getName().toLowerCase(Locale.ROOT).startsWith(name.toLowerCase(Locale.ROOT))) {
                                 target = p;
                                 break;
                             }
@@ -263,37 +286,61 @@ public class ChatListener implements Listener {
             contentComponent = miniMessage.deserialize(message);
         }
 
-        String format = channels != null ? channels.getString(activeChannel + ".format", plugin.getConfig().getString("chat.default-format", "<player>: <message>")) : "<player>: <message>";
-        if (Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) format = PlaceholderAPI.setPlaceholders(player, format);
-
         int messageId = plugin.getNextMessageId();
-        plugin.getMessageDataCache().put(messageId, new AdvancedChat.MessageData(player.getUniqueId(), activeChannel, apiEvent.getMessage(), player.hasPermission("advancedchat.admin")));
+        UUID senderUuid = player.getUniqueId();
+        plugin.getMessageDataCache().put(messageId, new AdvancedChat.MessageData(senderUuid, activeChannel, apiEvent.getMessage(), player.hasPermission("advancedchat.admin")));
         plugin.setLastMessageId(player.getUniqueId(), messageId);
 
         plugin.getDatabaseManager().incrementMessageCount(player.getUniqueId());
         plugin.getDatabaseManager().logMessage(messageId, player.getUniqueId(), message);
 
+        String format;
+        if (channels != null && activeChannel != null) {
+            format = channels.getString(activeChannel + ".format", plugin.getConfig().getString("chat.default-format", "<player>: <message>"));
+        } else {
+            format = plugin.getConfig().getString("chat.default-format", "<player>: <message>");
+        }
+
+        // Убираем <delete_edit_buttons> из формата, они будут добавлены индивидуально для каждого игрока
+        format = format.replace("<delete_edit_buttons>", "");
+        
+        // Замена плейсхолдера имени игрока для hover/click команд
+        format = format.replace("%player_name%", player.getName());
+
+        if (Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) format = PlaceholderAPI.setPlaceholders(player, format);
+
         String hoverText = plugin.getConfig().getString("colors.hover.player-hover", "<gray>Инфо</gray>").replace("{player}", player.getName());
         if (Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) hoverText = PlaceholderAPI.setPlaceholders(player, hoverText);
+        hoverText = hoverText.replace("\n", "<br>");
 
         List<String> clickCmds = plugin.getConfig().getStringList("colors.hover.click-command");
-        String clickCmd = clickCmds.isEmpty() ? "/msg {player} " : clickCmds.get(0).replace("{player}", player.getName());
+        String clickCmd = clickCmds.isEmpty() ? "/msg {player} " : clickCmds.getFirst().replace("{player}", player.getName());
 
-        // Поддержка головы игрока в формате: <head> или <h>
-        String playerFormat = plugin.getConfig().getString("chat.player-format", "<head> <player>");
-        boolean useHead = playerFormat.contains("<head>") || playerFormat.contains("<h>");
-        
-        String headTag = useHead ? "⊙ " : "";
-        String interactivePlayer = "<hover:show_text:'" + hoverText + "'><click:run_command:'" + clickCmd + "'>" + headTag + player.getName() + "</click></hover>";
+        // Создаём компонент игрока: голова + имя с hover/click
+        // Пытаемся получить кастомный скин из CMI
+        String cmiTexture = me.lovelace.advancedChat.depends.CMISkinUtil.getSkinTextureBase64(player.getUniqueId());
+        Component headComponent;
 
-        String delPrefix = "";
-        if (plugin.getConfig().getBoolean("messagedelete.enabled", true)) {
-            delPrefix = "<hover:show_text:'<red>Удалить'><click:run_command:'/md " + messageId + "'>" + plugin.getConfig().getString("messagedelete.prefix", "[x]") + "</click></hover> ";
+        if (cmiTexture != null && !cmiTexture.isEmpty()) {
+            // Используем кастомный скин из CMI через NBT-текстуру
+            String headJson = "{\"text\":\"\",\"extra\":[{\"text\":\"\",\"type\":\"minecraft:player\",\"id\":\"" + player.getUniqueId().toString() + "\",\"properties\":[{\"name\":\"textures\",\"value\":\"" + cmiTexture + "\"}]}]}";
+            headComponent = GsonComponentSerializer.gson().deserialize(headJson);
+        } else {
+            // Стандартная голова через Minecraft профиль
+            String headJson = "{\"text\":\"\",\"extra\":[{\"text\":\"\",\"type\":\"minecraft:player\",\"id\":\"" + player.getUniqueId().toString() + "\"}]}";
+            headComponent = GsonComponentSerializer.gson().deserialize(headJson);
         }
-        String editPrefix = "";
-        if (plugin.getConfig().getBoolean("messageedit.enabled", true)) {
-            editPrefix = "<hover:show_text:'<yellow>Изменить'><click:suggest_command:'/medit " + messageId + " " + apiEvent.getMessage().replace("'", "") + "'>" + plugin.getConfig().getString("messageedit.prefix", "<yellow>[✎]</yellow> ") + "</click></hover> ";
-        }
+
+        // Имя игрока (используем просто имя, а не displayName)
+        Component playerNameDisplay = Component.text(player.getName());
+
+        // Полный компонент: голова + пробел + имя с hover/click
+        Component playerComponent = Component.empty()
+                .append(headComponent)
+                .append(Component.text(" "))
+                .append(playerNameDisplay)
+                .hoverEvent(HoverEvent.showText(MiniMessage.miniMessage().deserialize(hoverText)))
+                .clickEvent(ClickEvent.runCommand(clickCmd));
 
         String formatOthers = plugin.getConfig().getString("mentions.format-others", "<green>%player%</green>");
         String formatTarget = plugin.getConfig().getString("mentions.format-target", "<yellow>%player%</yellow>");
@@ -301,26 +348,37 @@ public class ChatListener implements Listener {
         String msgOthers = message;
         for (Player m : mentionedPlayers) msgOthers = msgOthers.replace("<mention_" + m.getName() + ">", formatOthers.replace("%player%", m.getName()));
 
-        Component compOthers = miniMessage.deserialize(delPrefix + editPrefix + format,
-                Placeholder.parsed("player", interactivePlayer),
+        // Десериализуем формат с готовым компонентом игрока (с головой)
+        Component baseComponent = miniMessage.deserialize(format,
+                Placeholder.component("player", playerComponent),
                 Placeholder.component("message", mentionedPlayers.isEmpty() ? contentComponent : miniMessage.deserialize(msgOthers))
         );
 
         Map<UUID, Component> mentionedComps = new HashMap<>();
+
+        String soundConfig2 = plugin.getConfig().getString("mentions.sound");
+        String soundNameStr2 = soundConfig2 != null ? soundConfig2 : "entity.experience_orb.pickup";
+        Key soundKey2 = Key.key(soundNameStr2.contains(":") ? soundNameStr2 : "minecraft:" + soundNameStr2.toLowerCase(Locale.ROOT));
+
         for (Player target : mentionedPlayers) {
             String msgTarget = message;
             for (Player t2 : mentionedPlayers) {
-                if (t2.equals(target)) msgTarget = msgTarget.replace("<mention_" + t2.getName() + ">", formatTarget.replace("%player%", t2.getName()));
-                else msgTarget = msgTarget.replace("<mention_" + t2.getName() + ">", formatOthers.replace("%player%", t2.getName()));
+                if (t2.equals(target)) {
+                    msgTarget = msgTarget.replace("<mention_" + t2.getName() + ">", formatTarget.replace("%player%", t2.getName()));
+                } else {
+                    msgTarget = msgTarget.replace("<mention_" + t2.getName() + ">", formatOthers.replace("%player%", t2.getName()));
+                }
             }
-            mentionedComps.put(target.getUniqueId(), miniMessage.deserialize(delPrefix + editPrefix + format,
-                    Placeholder.parsed("player", interactivePlayer),
+            
+            mentionedComps.put(target.getUniqueId(), miniMessage.deserialize(format,
+                    Placeholder.component("player", playerComponent),
                     Placeholder.component("message", miniMessage.deserialize(msgTarget))
             ));
 
-            String soundName = plugin.getConfig().getString("mentions.sound", "ENTITY_EXPERIENCE_ORB_PICKUP");
-            if (!soundName.equalsIgnoreCase("NONE")) {
-                try { target.playSound(target.getLocation(), Sound.valueOf(soundName.toUpperCase()), 1f, 1f); } catch (Exception ignored) {}
+            if (!soundNameStr2.equalsIgnoreCase("NONE")) {
+                try {
+                    target.playSound(Sound.sound(soundKey2, net.kyori.adventure.sound.Sound.Source.MASTER, 1f, 1f));
+                } catch (Exception ignored) {}
             }
             if (plugin.getConfig().getBoolean("mentions.actionbar.enabled", true)) {
                 target.sendActionBar(miniMessage.deserialize(plugin.getConfig().getString("mentions.actionbar.text", "<gold>Вас упомянули в чате!</gold>")));
@@ -328,18 +386,47 @@ public class ChatListener implements Listener {
         }
 
         boolean senderIsAdmin = player.hasPermission("advancedchat.admin") && plugin.getConfig().getBoolean("ignore.admins-bypass", true);
+        boolean isAdminChannel = "admin".equals(activeChannel);
+
+        // Генерация кнопок удаления/редактирования
+        String editPrefix = "";
+        if (plugin.getConfig().getBoolean("messageedit.enabled", true)) {
+            editPrefix = " <hover:show_text:'<yellow>Изменить'><click:run_command:'/medit " + messageId + "'>" + plugin.getConfig().getString("messageedit.prefix", "<yellow>[✎]</yellow>") + "</click></hover>";
+        }
+        String delPrefix = "";
+        if (plugin.getConfig().getBoolean("messagedelete.enabled", true)) {
+            delPrefix = "<hover:show_text:'<red>Удалить'><click:run_command:'/md " + messageId + "'>" + plugin.getConfig().getString("messagedelete.prefix", "<dark_gray>[<red>x</red>]</dark_gray>") + "</click></hover>";
+        }
+        // Порядок: сначала редактировать, потом удалить
+        String buttons = editPrefix + delPrefix;
 
         for (Player p : Bukkit.getOnlinePlayers()) {
 
+            // Игроки без пермиссиона не должны видеть сообщения из админ-канала
+            if (isAdminChannel && !p.hasPermission("advancedchat.admin")) {
+                continue;
+            }
+
+            // Ignore учитывает обход админов
             if (plugin.isIgnoring(p.getUniqueId(), player.getUniqueId()) && !senderIsAdmin) {
                 continue;
             }
 
-            if (plugin.isSilent(p.getUniqueId()) && !senderIsAdmin && !p.equals(player)) {
+            // ИСПРАВЛЕНИЕ: Silent режим теперь блокирует ВСЁ, даже от админов
+            if (plugin.isSilent(p.getUniqueId()) && !p.equals(player)) {
                 continue;
             }
 
-            Component toSend = mentionedComps.getOrDefault(p.getUniqueId(), compOthers);
+            Component toSend = mentionedComps.getOrDefault(p.getUniqueId(), baseComponent);
+
+            // Добавляем кнопки только автору сообщения или админам
+            boolean isOwner = p.getUniqueId().equals(senderUuid);
+            boolean isAdmin = p.hasPermission("advancedchat.admin") || p.hasPermission("advancedchat.moderation");
+
+            // Кнопки добавляются ПОСЛЕ сообщения
+            if (isOwner || isAdmin) {
+                toSend = baseComponent.append(miniMessage.deserialize(buttons));
+            }
 
             if (finalRadius != -1 && (!p.getWorld().equals(senderLoc.getWorld()) || p.getLocation().distanceSquared(senderLoc) > finalRadius * finalRadius)) {
                 if (plugin.isSpy(p.getUniqueId())) {
@@ -352,9 +439,28 @@ public class ChatListener implements Listener {
             plugin.addChatLineAndSend(p, messageId, toSend);
         }
 
-        Bukkit.getConsoleSender().sendMessage(compOthers);
+        Bukkit.getConsoleSender().sendMessage(baseComponent);
 
-        // Показываем ChatBubble над головой игрока
-        chatBubbleManager.showBubble(player, message, activeChannel);
+        final String finalMessage = message;
+        final String finalChannel = activeChannel;
+        Bukkit.getRegionScheduler().execute(plugin, senderLoc, () -> {
+            if (finalChannel != null) {
+                chatBubbleManager.showBubble(player, finalMessage, finalChannel);
+            }
+            plugin.getPinnedMessageManager().checkAutoPin(player, finalMessage);
+        });
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onCommandPreprocess(PlayerCommandPreprocessEvent event) {
+        Player player = event.getPlayer();
+        String cmd = event.getMessage().toLowerCase();
+
+        if (cmd.equals("/medit cancel") || cmd.equals("/cancel")) return;
+
+        if (plugin.getEditSession(player.getUniqueId()) != null) {
+            plugin.removeEditSession(player.getUniqueId());
+            plugin.sendMessage(player, "edit-cancelled-command");
+        }
     }
 }

@@ -1,5 +1,6 @@
-package me.lovelace.advancedChat;
+package me.lovelace.advancedChat.managers;
 
+import me.lovelace.advancedChat.AdvancedChat;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
@@ -15,29 +16,145 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 public class CommandManager implements CommandExecutor, TabCompleter {
     private final AdvancedChat plugin;
     private final MiniMessage mm = MiniMessage.miniMessage();
 
-    public CommandManager(AdvancedChat plugin) {
+    public CommandManager(@NotNull AdvancedChat plugin) {
         this.plugin = plugin;
     }
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
-        // Убрали асинхронность, чтобы ядро Paper не блокировало проверку прав и поиск игроков!
         processCommand(sender, command, args);
         return true;
     }
 
-    private void processCommand(CommandSender sender, Command command, String[] args) {
+    private void processCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String[] args) {
         boolean isAchCmd = command.getName().equalsIgnoreCase("ach") || command.getName().equalsIgnoreCase("chat");
         boolean isSilentCmd = command.getName().equalsIgnoreCase("silent") || (isAchCmd && args.length >= 1 && args[0].equalsIgnoreCase("silent"));
         boolean isTagToggleCmd = command.getName().equalsIgnoreCase("tagtoggle") || (isAchCmd && args.length >= 1 && args[0].equalsIgnoreCase("tagtoggle"));
         boolean isSpyCmd = command.getName().equalsIgnoreCase("spy") || (isAchCmd && args.length >= 1 && args[0].equalsIgnoreCase("spy"));
         boolean isIgnoreCmd = command.getName().equalsIgnoreCase("ignorechat") || (isAchCmd && args.length >= 1 && (args[0].equalsIgnoreCase("ignore") || args[0].equalsIgnoreCase("ignorechat")));
         boolean isChatClearCmd = command.getName().equalsIgnoreCase("chatclear") || command.getName().equalsIgnoreCase("cc") || (isAchCmd && args.length >= 1 && (args[0].equalsIgnoreCase("chatclear") || args[0].equalsIgnoreCase("cc")));
+        boolean isPinCmd = command.getName().equalsIgnoreCase("pin");
+        boolean isPollCmd = command.getName().equalsIgnoreCase("poll");
+
+        // --- PIN COMMAND ---
+        if (isPinCmd && sender instanceof Player p) {
+            if (!p.hasPermission("advancedchat.pin.use")) {
+                plugin.sendMessage(p, "pin-no-permission");
+                return;
+            }
+            if (args.length == 0) {
+                plugin.sendMessage(p, "pin-usage");
+                return;
+            }
+            if (args[0].equalsIgnoreCase("remove") && p.hasPermission("advancedchat.pin.admin")) {
+                if (args.length < 2) {
+                    plugin.sendMessage(p, "pin-remove-usage");
+                    return;
+                }
+                try {
+                    int pinId = Integer.parseInt(args[1]);
+                    plugin.getPinnedMessageManager().unpinMessage(pinId);
+                } catch (NumberFormatException e) {
+                    plugin.sendMessage(p, "pin-invalid-id");
+                }
+                return;
+            }
+            if (args[0].equalsIgnoreCase("list")) {
+                plugin.getPinnedMessageManager().listPinned(p);
+                return;
+            }
+            if (args[0].equalsIgnoreCase("clear") && p.hasPermission("advancedchat.pin.admin")) {
+                plugin.getPinnedMessageManager().clearAll(p);
+                return;
+            }
+
+            StringBuilder text = new StringBuilder();
+            for (String arg : args) text.append(arg).append(" ");
+            int duration = 0;
+            if (args.length >= 2) {
+                try {
+                    String lastArg = args[args.length - 1];
+                    duration = Integer.parseInt(lastArg);
+                    text = new StringBuilder();
+                    for (int i = 0; i < args.length - 1; i++) text.append(args[i]).append(" ");
+                } catch (NumberFormatException ignored) {
+                    text = new StringBuilder();
+                    for (String arg : args) text.append(arg).append(" ");
+                }
+            }
+            plugin.getPinnedMessageManager().pinMessage(p, text.toString().trim(), duration);
+            return;
+        }
+
+        // --- POLL COMMAND ---
+        if (isPollCmd && sender instanceof Player p) {
+            if (args.length == 0) {
+                plugin.sendMessage(p, "poll-usage");
+                return;
+            }
+            String subCmd = args[0].toLowerCase();
+            if (subCmd.equalsIgnoreCase("create")) {
+                if (!p.hasPermission("advancedchat.poll.create")) {
+                    plugin.sendMessage(p, "poll-no-permission-create");
+                    return;
+                }
+                if (args.length < 2) {
+                    plugin.sendMessage(p, "poll-no-options");
+                    return;
+                }
+                String[] createArgs = new String[args.length - 1];
+                System.arraycopy(args, 1, createArgs, 0, args.length - 1);
+                int duration = 0; // По умолчанию без времени
+                plugin.getPollManager().createPoll(p, createArgs, duration);
+            } else if (subCmd.equalsIgnoreCase("vote")) {
+                if (!p.hasPermission("advancedchat.poll.vote")) {
+                    plugin.sendMessage(p, "poll-no-permission-vote");
+                    return;
+                }
+                if (args.length < 3) {
+                    plugin.sendMessage(p, "poll-vote-usage");
+                    return;
+                }
+                try {
+                    int pollId = Integer.parseInt(args[1]);
+                    int option = Integer.parseInt(args[2]);
+                    plugin.getPollManager().vote(p, pollId, option);
+                } catch (NumberFormatException e) {
+                    plugin.sendMessage(p, "poll-invalid-id");
+                }
+            } else if (subCmd.equalsIgnoreCase("end") && p.hasPermission("advancedchat.poll.admin")) {
+                if (args.length < 2) {
+                    plugin.sendMessage(p, "poll-end-usage");
+                    return;
+                }
+                try {
+                    int pollId = Integer.parseInt(args[1]);
+                    plugin.getPollManager().endPoll(pollId, p);
+                } catch (NumberFormatException e) {
+                    plugin.sendMessage(p, "poll-invalid-id");
+                }
+            } else if (subCmd.equalsIgnoreCase("results")) {
+                if (args.length < 2) {
+                    plugin.sendMessage(p, "poll-results-usage");
+                    return;
+                }
+                try {
+                    int pollId = Integer.parseInt(args[1]);
+                    plugin.getPollManager().showResults(p, pollId);
+                } catch (NumberFormatException e) {
+                    plugin.sendMessage(p, "poll-invalid-id");
+                }
+            } else {
+                plugin.sendMessage(p, "poll-usage");
+            }
+            return;
+        }
 
         // --- CHAT CLEAR ---
         if (isChatClearCmd) {
@@ -64,7 +181,7 @@ public class CommandManager implements CommandExecutor, TabCompleter {
 
             if (mode.equals("personal")) {
                 if (!(sender instanceof Player p)) {
-                    sender.sendMessage(mm.deserialize("<red>Эта команда только для игроков.</red>"));
+                    plugin.sendMessage(sender, "player-only");
                     return;
                 }
                 plugin.clearChatForPlayer(p, true);
@@ -112,7 +229,7 @@ public class CommandManager implements CommandExecutor, TabCompleter {
             return;
         }
 
-        // --- TAG TOGGLE (РЕЖИМ "НЕ БЕСПОКОИТЬ") ---
+        // --- TAG TOGGLE ---
         if (isTagToggleCmd) {
             if (!sender.hasPermission("advancedchat.tagtoggle")) {
                 plugin.sendMessage(sender, "no-permission");
@@ -129,23 +246,22 @@ public class CommandManager implements CommandExecutor, TabCompleter {
             }
 
             if (target == null) {
-                sender.sendMessage(mm.deserialize("<red>Игрок не найден.</red>"));
+                plugin.sendMessage(sender, "player-not-found");
                 return;
             }
 
             plugin.toggleTagsDisabled(target.getUniqueId());
             boolean disabled = plugin.hasTagsDisabled(target.getUniqueId());
 
-            String prefix = plugin.getRawMsg("prefix");
             if (sender.equals(target)) {
-                sender.sendMessage(mm.deserialize(prefix + (disabled ? "<yellow>Теперь другие игроки не смогут вас упоминать.</yellow>" : "<green>Теперь другие игроки снова могут вас упоминать.</green>")));
+                plugin.sendMessage(sender, disabled ? "tags-disabled-self" : "tags-enabled-self");
             } else {
-                sender.sendMessage(mm.deserialize(prefix + "<green>Упоминания для " + target.getName() + (disabled ? " отключены." : " включены.") + "</green>"));
+                plugin.sendMessage(sender, disabled ? "tags-disabled-other" : "tags-enabled-other", "{player}", target.getName());
             }
             return;
         }
 
-        // --- DYNAMIC CHANNEL SWITCHER ---
+        // --- CHANNEL SWITCHER ---
         if (command.getName().equalsIgnoreCase("channel") && sender instanceof Player p) {
             ConfigurationSection channels = plugin.getConfig().getConfigurationSection("colors.channels");
             if (channels == null) return;
@@ -222,116 +338,91 @@ public class CommandManager implements CommandExecutor, TabCompleter {
             return;
         }
 
-        // --- MESSAGE DELETE ---
+        // --- ИСПРАВЛЕНО: MESSAGE DELETE ---
         if (command.getName().equalsIgnoreCase("messagedelete") || command.getName().equalsIgnoreCase("md")) {
-            if (args.length == 1) {
-                try {
-                    int msgId = Integer.parseInt(args[0]);
+            if (args.length == 0) return;
+            try {
+                int msgId = Integer.parseInt(args[0]);
+                AdvancedChat.MessageData data = plugin.getMessageDataCache().getIfPresent(msgId);
 
-                    if (!sender.hasPermission("advancedchat.delete.admin") && !sender.hasPermission("advancedchat.delete.own")) {
-                        plugin.sendMessage(sender, "no-permission");
-                        return;
-                    }
-                    AdvancedChat.MessageData data = plugin.getMessageDataCache().getIfPresent(msgId);
-                    if (data == null) {
-                        plugin.sendMessage(sender, "delete-not-found");
-                        return;
-                    }
+                // Перевел права на стандартную модель, как с polls и pins
+                boolean isAdmin = sender.hasPermission("advancedchat.delete.admin") || sender.isOp();
 
-                    boolean isAdmin = sender.hasPermission("advancedchat.delete.admin");
-                    boolean isOwn = sender instanceof Player && data.owner().equals(((Player) sender).getUniqueId());
-
-                    if (isAdmin || isOwn) {
-                        plugin.deleteMessageVisual(msgId, sender);
-                    } else {
-                        plugin.sendMessage(sender, "delete-not-yours");
-                    }
-                } catch (NumberFormatException e) {
-                    plugin.sendMessage(sender, "delete-no-args");
+                if (data == null) {
+                    if (isAdmin) plugin.deleteMessageVisual(msgId, sender);
+                    else plugin.sendMessage(sender, "delete-not-found");
+                    return;
                 }
-            }
+
+                boolean isOwn = sender instanceof Player player && data.owner().equals(player.getUniqueId());
+
+                if (isAdmin || (isOwn && sender.hasPermission("advancedchat.delete"))) {
+                    plugin.deleteMessageVisual(msgId, sender);
+                } else {
+                    plugin.sendMessage(sender, "delete-not-yours");
+                }
+            } catch (NumberFormatException ignored) {}
             return;
         }
 
-        // --- MESSAGE EDIT ---
+        // --- ИСПРАВЛЕНО: MESSAGE EDIT ---
         if (command.getName().equalsIgnoreCase("messageedit") || command.getName().equalsIgnoreCase("medit")) {
-            if (!sender.hasPermission("advancedchat.use")) {
-                plugin.sendMessage(sender, "no-permission");
-                return;
-            }
+            if (!(sender instanceof Player p)) return;
 
-            if (args.length == 0) {
-                if (sender instanceof Player p) {
-                    Integer lastId = plugin.getLastMessageId(p.getUniqueId());
-                    if (lastId == null) {
-                        plugin.sendMessage(p, "edit-not-found");
-                        return;
-                    }
-                    AdvancedChat.MessageData data = plugin.getMessageDataCache().getIfPresent(lastId);
-                    if (data == null) {
-                        plugin.sendMessage(p, "edit-not-found");
-                        return;
-                    }
-                    String prompt = plugin.getRawMsg("edit-click-prompt");
-                    p.sendMessage(mm.deserialize("<click:suggest_command:'/medit " + lastId + " " + data.rawText().replace("'", "") + "'>" + prompt + "</click>"));
+            if (args.length == 1 && args[0].equalsIgnoreCase("cancel")) {
+                if (plugin.getEditSession(p.getUniqueId()) != null) {
+                    plugin.removeEditSession(p.getUniqueId());
+                    p.sendMessage(mm.deserialize("<red>Редактирование отменено.</red>"));
                 }
                 return;
             }
 
-            if (args.length >= 2) {
-                try {
-                    int msgId = Integer.parseInt(args[0]);
-                    AdvancedChat.MessageData data = plugin.getMessageDataCache().getIfPresent(msgId);
-                    if (data == null) {
-                        plugin.sendMessage(sender, "edit-not-found");
-                        return;
-                    }
-                    if (sender instanceof Player p && !data.owner().equals(p.getUniqueId()) && !p.hasPermission("advancedchat.admin")) {
-                        plugin.sendMessage(sender, "delete-not-yours");
-                        return;
-                    }
+            if (args.length == 0) return;
 
-                    StringBuilder newText = new StringBuilder();
-                    for (int i = 1; i < args.length; i++) {
-                        newText.append(args[i]).append(" ");
-                    }
-                    String finalText = newText.toString().trim();
+            try {
+                int msgId = Integer.parseInt(args[0]);
+                AdvancedChat.MessageData data = plugin.getMessageDataCache().getIfPresent(msgId);
 
-                    Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-                        me.lovelace.advancedChat.api.events.AdvancedChatMessageEditEvent editEvent =
-                                new me.lovelace.advancedChat.api.events.AdvancedChatMessageEditEvent((Player) sender, msgId, data.rawText(), finalText);
-                        Bukkit.getPluginManager().callEvent(editEvent);
-
-                        if (editEvent.isCancelled()) return;
-
-                        String eventFinalText = editEvent.getNewMessage();
-                        plugin.editMessageVisual(msgId, eventFinalText, (Player) sender);
-                    });
-
-                } catch (NumberFormatException e) {
-                    plugin.sendMessage(sender, "edit-no-args");
+                if (data == null) {
+                    plugin.sendMessage(sender, "edit-not-found");
+                    return;
                 }
-            } else {
-                plugin.sendMessage(sender, "edit-no-args");
-            }
+
+                boolean isAdmin = p.hasPermission("advancedchat.edit.admin") || p.isOp();
+                boolean isOwn = data.owner().equals(p.getUniqueId());
+
+                if (!isAdmin && !(isOwn && p.hasPermission("advancedchat.edit"))) {
+                    plugin.sendMessage(sender, "delete-not-yours"); // Здесь в messages.yml должно быть "edit-not-yours" по-хорошему
+                    return;
+                }
+
+                plugin.startEditSession(p, msgId, data.rawText());
+
+            } catch (NumberFormatException ignored) {}
             return;
         }
 
         // --- ACH COMMAND ---
         if (isAchCmd) {
             if (args.length >= 1 && args[0].equalsIgnoreCase("reload") && sender.hasPermission("advancedchat.admin")) {
-                String type = (args.length > 1) ? args[1].toLowerCase() : "all";
+                String type = (args.length > 1) ? args[1].toLowerCase(Locale.ROOT) : "all";
                 if (type.equals("config")) {
                     plugin.reloadConfig();
                     plugin.registerDynamicChannelCommands();
-                    sender.sendMessage(mm.deserialize(plugin.getRawMsg("prefix") + "<green>Конфигурация (config.yml) успешно перезагружена.</green>"));
+                    plugin.getChatBubbleManager().loadConfig();
+                    plugin.getPinnedMessageManager().loadConfig();
+                    plugin.getPollManager().loadConfig();
+                    plugin.sendMessage(sender, "reload-success");
                 } else if (type.equals("message") || type.equals("messages")) {
                     plugin.loadMessages();
-                    sender.sendMessage(mm.deserialize(plugin.getRawMsg("prefix") + "<green>Сообщения (messages.yml) успешно перезагружены.</green>"));
+                    plugin.sendMessage(sender, "reload-messages-success");
                 } else {
                     plugin.reloadConfig();
                     plugin.loadMessages();
                     plugin.registerDynamicChannelCommands();
+                    plugin.getChatBubbleManager().loadConfig();
+                    plugin.getPinnedMessageManager().loadConfig();
+                    plugin.getPollManager().loadConfig();
                     plugin.sendMessage(sender, "reload-success");
                 }
                 return;
@@ -369,6 +460,7 @@ public class CommandManager implements CommandExecutor, TabCompleter {
                 completions.add("all");
                 completions.add("config");
                 completions.add("message");
+                completions.add("messages");
                 return StringUtil.copyPartialMatches(args[1], completions, new ArrayList<>());
             }
             else if (args.length == 2 && args[0].equalsIgnoreCase("chatclear")) {
@@ -424,6 +516,25 @@ public class CommandManager implements CommandExecutor, TabCompleter {
         if (command.getName().equalsIgnoreCase("ignorechat")) {
             if (args.length == 1) {
                 for (Player p : Bukkit.getOnlinePlayers()) completions.add(p.getName());
+                return StringUtil.copyPartialMatches(args[0], completions, new ArrayList<>());
+            }
+        }
+
+        if (command.getName().equalsIgnoreCase("pin")) {
+            if (args.length == 1) {
+                completions.add("remove");
+                completions.add("list");
+                completions.add("clear");
+                return StringUtil.copyPartialMatches(args[0], completions, new ArrayList<>());
+            }
+        }
+
+        if (command.getName().equalsIgnoreCase("poll")) {
+            if (args.length == 1) {
+                completions.add("create");
+                completions.add("vote");
+                completions.add("end");
+                completions.add("results");
                 return StringUtil.copyPartialMatches(args[0], completions, new ArrayList<>());
             }
         }

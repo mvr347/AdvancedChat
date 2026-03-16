@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>me.lovelace</groupId>
     <artifactId>AdvancedChat</artifactId>
-    <version>2.0</version>
+    <version>2.5</version>
     <packaging>jar</packaging>
 
     <properties>
@@ -33,34 +33,51 @@
     </repositories>
 
     <dependencies>
+        <!-- Paper API 1.21.11 (Mounts of Mayhem drop, December 2025) -->
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
             <version>1.21.11-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
+        
+        <!-- PlaceholderAPI 2.11+ для плейсхолдеров -->
         <dependency>
             <groupId>me.clip</groupId>
             <artifactId>placeholderapi</artifactId>
             <version>2.11.6</version>
             <scope>provided</scope>
         </dependency>
+        
+        <!-- Caffeine для кэширования -->
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
             <version>3.1.8</version>
             <scope>provided</scope>
         </dependency>
+        
+        <!-- ProtocolLib 5.x для перехвата пакетов -->
         <dependency>
             <groupId>com.comphenix.protocol</groupId>
             <artifactId>ProtocolLib</artifactId>
             <version>5.3.0</version>
             <scope>provided</scope>
         </dependency>
+        
+        <!-- CMI API для поддержки скинов -->
         <dependency>
             <groupId>com.github.Zrips</groupId>
             <artifactId>CMI-API</artifactId>
             <version>9.7.14.3</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Gson для парсинга JSON -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.10.1</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>
@@ -76,6 +93,25 @@
                     <target>${java.version}</target>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.2</version>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <Built-By>AdvancedChat Team</Built-By>
+                            <Implementation-Version>${project.version}</Implementation-Version>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
         </plugins>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
     </build>
 </project>
