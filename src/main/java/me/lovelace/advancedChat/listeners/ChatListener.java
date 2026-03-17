@@ -33,6 +33,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import me.lovelace.advancedChat.depends.HeadComponentUtil;
 
+@SuppressWarnings({"unused", "UnsubstitutedExpression", "HttpUrlsUsage", "DuplicatedCode"})
 public class ChatListener implements Listener {
     private final AdvancedChat plugin;
     private final MiniMessage miniMessage;
@@ -51,6 +52,7 @@ public class ChatListener implements Listener {
     }
 
     @EventHandler
+    @SuppressWarnings("unused")
     public void onPlayerJoin(@NotNull PlayerJoinEvent event) {
         Player player = event.getPlayer();
         UUID uuid = player.getUniqueId();
@@ -66,6 +68,7 @@ public class ChatListener implements Listener {
     }
 
     @EventHandler
+    @SuppressWarnings("unused")
     public void onPlayerQuit(@NotNull PlayerQuitEvent event) {
         UUID uuid = event.getPlayer().getUniqueId();
         plugin.removeEditSession(uuid);
@@ -78,6 +81,7 @@ public class ChatListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    @SuppressWarnings("unused")
     public void onModernChat(@NotNull AsyncChatEvent event) {
         Player player = event.getPlayer();
         if (plugin.isWorldDisabled(player.getWorld().getName())) return;
@@ -343,7 +347,7 @@ public class ChatListener implements Listener {
             } else {
                 propertiesJson = "\"properties\":[{\"name\":\"textures\",\"value\":\"" + skinProp.value() + "\"}]";
             }
-            String fakeUuid = HeadComponentUtil.makeSkinUuid(player.getName()).toString();
+            String fakeUuid = String.valueOf(HeadComponentUtil.makeSkinUuid(player.getName()));
             String fakeName = HeadComponentUtil.makeSkinName(player.getName());
             String headJson = "{\"text\":\"\",\"extra\":[{\"text\":\"\",\"type\":\"minecraft:player\",\"id\":\""
                     + fakeUuid
@@ -351,7 +355,7 @@ public class ChatListener implements Listener {
             headComponent = GsonComponentSerializer.gson().deserialize(headJson);
         } else if (headComponent == null) {
             String headJson = "{\"text\":\"\",\"extra\":[{\"text\":\"\",\"type\":\"minecraft:player\",\"id\":\""
-                    + player.getUniqueId().toString()
+                    + player.getUniqueId()
                     + "\",\"name\":\"" + player.getName() + "\"}]}";
             headComponent = GsonComponentSerializer.gson().deserialize(headJson);
         }
@@ -490,6 +494,7 @@ public class ChatListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @SuppressWarnings("unused")
     public void onCommandPreprocess(PlayerCommandPreprocessEvent event) {
         Player player = event.getPlayer();
         if (plugin.isWorldDisabled(player.getWorld().getName())) return;

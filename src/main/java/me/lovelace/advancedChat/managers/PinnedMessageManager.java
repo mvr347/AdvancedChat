@@ -20,6 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Использует BossBar для отображения вверху экрана.
  * Использует современный Paper API Scheduler (совместим с Folia).
  */
+@SuppressWarnings({"DuplicatedCode", "unused"})
 public class PinnedMessageManager {
     private final AdvancedChat plugin;
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
@@ -86,7 +87,7 @@ public class PinnedMessageManager {
     public int pinMessage(@NotNull Player player, @NotNull String text, int duration) {
         if (!enabled) return -1;
 
-        if (text == null || text.trim().isEmpty()) {
+        if (text.trim().isEmpty()) {
             plugin.sendMessage(player, "pin-usage");
             return -1;
         }
@@ -228,7 +229,7 @@ public class PinnedMessageManager {
             if (plugin.isWorldDisabled(p.getWorld().getName())) {
                 continue;
             }
-            if (silentPlayers != null && silentPlayers.contains(p.getUniqueId())) {
+            if (silentPlayers.contains(p.getUniqueId())) {
                 continue;
             }
             p.showBossBar(bossBar);
@@ -281,7 +282,7 @@ public class PinnedMessageManager {
         if (plugin.isWorldDisabled(player.getWorld().getName())) return;
 
         Set<UUID> silentPlayers = plugin.getSilentPlayers();
-        if (silentPlayers != null && silentPlayers.contains(player.getUniqueId())) {
+        if (silentPlayers.contains(player.getUniqueId())) {
             return;
         }
 
@@ -295,11 +296,13 @@ public class PinnedMessageManager {
     }
 
     @Nullable
+    @SuppressWarnings("unused")
     public PinnedBossBar getPinnedMessage(int pinId) {
         return pinnedMessages.get(pinId);
     }
 
     @NotNull
+    @SuppressWarnings("unused")
     public Map<Integer, PinnedBossBar> getPinnedMessages() {
         return pinnedMessages;
     }
@@ -389,10 +392,12 @@ public class PinnedMessageManager {
             this.ticksLeft = this.totalTicks;
         }
 
+        @SuppressWarnings("unused")
         public boolean isExpired() {
             return expiresAt > 0 && expiresAt < System.currentTimeMillis();
         }
 
+        @SuppressWarnings("unused")
         public boolean isPermanent() {
             return expiresAt == 0;
         }

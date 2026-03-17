@@ -3,10 +3,10 @@ package me.lovelace.advancedChat.managers;
 import com.google.gson.Gson;
 import me.lovelace.advancedChat.AdvancedChat;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.minimessage.MiniMessage;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+import net.kyori.adventure.sound.Sound;
 import org.bukkit.Bukkit;
-import org.bukkit.Sound;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
@@ -24,6 +24,12 @@ public class PollManager {
     private final AdvancedChat plugin;
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
     private final Gson gson = new Gson();
+    private static final Sound POLL_SOUND = Sound.sound(
+            Key.key("minecraft:ui.button.click"),
+            Sound.Source.MASTER,
+            1.0f,
+            1.0f
+    );
 
     private final Map<Integer, PollData> activePolls = new ConcurrentHashMap<>();
     private final Map<Integer, Map<UUID, Integer>> pollVotes = new ConcurrentHashMap<>();
@@ -316,7 +322,7 @@ public class PollManager {
             if (plugin.isWorldDisabled(p.getWorld().getName())) continue;
             p.sendMessage(resultsComp);
             try {
-                p.playSound(p.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+                p.playSound(POLL_SOUND);
             } catch (IllegalArgumentException ignored) {}
         }
     }
@@ -378,10 +384,9 @@ public class PollManager {
                         plugin.getDatabaseManager().endPoll(pollId);
                         String endFormat = plugin.getRawMsg("poll-ended-format").replace("{id}", String.valueOf(pollId));
                         Component endComponent = miniMessage.deserialize(endFormat);
-                        String endPlain = PlainTextComponentSerializer.plainText().serialize(endComponent);
                         for (Player p : Bukkit.getOnlinePlayers()) {
                             if (plugin.isWorldDisabled(p.getWorld().getName())) continue;
-                            p.sendMessage(endPlain);
+                            p.sendMessage(endComponent);
                         }
                     }
                 }
@@ -391,6 +396,7 @@ public class PollManager {
         );
     }
 
+    @SuppressWarnings("unused")
     public int getActivePollCount() {
         return activePolls.size();
     }

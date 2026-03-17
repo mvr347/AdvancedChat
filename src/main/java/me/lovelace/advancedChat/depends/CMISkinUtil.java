@@ -18,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Утилита для работы со скинами CMI.
  * Позволяет получать скины игроков, установленные через /skin.
  */
+@SuppressWarnings({"HttpUrlsUsage", "DuplicatedCode", "unused"})
 public class CMISkinUtil {
 
     private static boolean cmiEnabled = false;
@@ -212,13 +213,12 @@ public class CMISkinUtil {
         return getSkinPropertyFromCmi(player.getUniqueId(), player.getName());
     }
 
-    @SuppressWarnings("deprecation")
     private static void setSkullTexture(SkullMeta skullMeta, String texture, UUID uuid) {
         try {
             Class<?> profileClass = Class.forName("com.mojang.authlib.GameProfile");
             Object profile = profileClass.getConstructor(UUID.class, String.class)
                     .newInstance(uuid, "ChatBubble_" + uuid.toString().substring(0, 8));
-            Class<?> propertyClass = (Class<?>) Class.forName("com.mojang.authlib.properties.Property");
+            Class<?> propertyClass = Class.forName("com.mojang.authlib.properties.Property");
             Object property = propertyClass.getConstructor(String.class, String.class)
                     .newInstance("textures", texture);
             Object propertyMap = profileClass.getMethod("getProperties").invoke(profile);
@@ -576,7 +576,7 @@ public class CMISkinUtil {
      * @param uuid UUID игрока
      * @return JSON строка для GsonComponentSerializer
      */
-    public static String createHeadJsonWithSkin(String playerName, UUID uuid) {
+    public static String createHeadJsonWithSkin(String playerName, @SuppressWarnings("unused") UUID uuid) {
         // Простой формат - только имя игрока
         // Голова будет добавлена отдельно через Component
         return "{\"text\":\"" + playerName + "\"}";
@@ -586,6 +586,7 @@ public class CMISkinUtil {
      * Получить URL текстуры скина игрока из CMI.
      * Возвращает прямой URL на PNG текстуру или null если не удалось.
      */
+    @SuppressWarnings("unused")
     public static String getPlayerSkinUrl(Player player) {
         if (isCMIAvailable()) {
             String texture = getSkinTexture(player.getUniqueId());
@@ -595,11 +596,10 @@ public class CMISkinUtil {
                     String decoded = new String(java.util.Base64.getDecoder().decode(texture));
                     // Парсим JSON чтобы получить URL
                     JsonObject json = JsonParser.parseString(decoded).getAsJsonObject();
-                    String url = json.getAsJsonObject("textures")
+                    return json.getAsJsonObject("textures")
                             .getAsJsonObject("SKIN")
                             .get("url")
                             .getAsString();
-                    return url;
                 } catch (Exception e) {
                     AdvancedChat.getInstance().getLogger().warning("Ошибка получения URL скина: " + e.getMessage());
                 }

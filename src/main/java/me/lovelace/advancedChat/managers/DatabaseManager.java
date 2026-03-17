@@ -548,6 +548,7 @@ public class DatabaseManager {
     /**
      * Получить данные опроса
      */
+    @SuppressWarnings("unused")
     public CompletableFuture<PollData> getPoll(int pollId) {
         return CompletableFuture.supplyAsync(() -> {
             try (PreparedStatement pstmt = connection.prepareStatement(
@@ -574,6 +575,7 @@ public class DatabaseManager {
     /**
      * Получить все активные опросы
      */
+    @SuppressWarnings("unused")
     public CompletableFuture<List<PollData>> getActivePolls() {
         return CompletableFuture.supplyAsync(() -> {
             List<PollData> result = new ArrayList<>();
@@ -617,6 +619,7 @@ public class DatabaseManager {
     /**
      * Получить голос игрока в опросе
      */
+    @SuppressWarnings("unused")
     public CompletableFuture<Integer> getPollVote(int pollId, UUID voterUuid) {
         return CompletableFuture.supplyAsync(() -> {
             try (PreparedStatement pstmt = connection.prepareStatement(
@@ -634,6 +637,7 @@ public class DatabaseManager {
     /**
      * Получить голоса для опроса по опциям
      */
+    @SuppressWarnings("unused")
     public CompletableFuture<int[]> getPollResults(int pollId, int optionCount) {
         return CompletableFuture.supplyAsync(() -> {
             int[] votes = new int[optionCount];
@@ -656,6 +660,7 @@ public class DatabaseManager {
     /**
      * Получить общее количество голосов в опросе
      */
+    @SuppressWarnings("unused")
     public CompletableFuture<Integer> getTotalPollVotes(int pollId) {
         return CompletableFuture.supplyAsync(() -> {
             try (PreparedStatement pstmt = connection.prepareStatement(
@@ -686,6 +691,7 @@ public class DatabaseManager {
     /**
      * Получить количество активных опросов
      */
+    @SuppressWarnings("unused")
     public CompletableFuture<Integer> getActivePollCount() {
         return CompletableFuture.supplyAsync(() -> {
             try (PreparedStatement pstmt = connection.prepareStatement(
@@ -715,6 +721,7 @@ public class DatabaseManager {
     /**
      * Данные закреплённого сообщения
      */
+    @SuppressWarnings("ClassCanBeRecord")
     public static class PinnedMessageData {
         public final int id;
         public final int messageId;
@@ -732,10 +739,12 @@ public class DatabaseManager {
             this.expiresAt = expiresAt;
         }
 
+        @SuppressWarnings("unused")
         public boolean isExpired() {
             return expiresAt > 0 && expiresAt < System.currentTimeMillis();
         }
 
+        @SuppressWarnings("unused")
         public boolean isPermanent() {
             return expiresAt == 0;
         }
@@ -744,6 +753,7 @@ public class DatabaseManager {
     /**
      * Данные опроса
      */
+    @SuppressWarnings("ClassCanBeRecord")
     public static class PollData {
         public final int id;
         public final String creatorUuid;
@@ -763,10 +773,12 @@ public class DatabaseManager {
             this.active = active;
         }
 
+        @SuppressWarnings("unused")
         public boolean isEnded() {
             return !active || endTime > 0 && endTime < System.currentTimeMillis();
         }
 
+        @SuppressWarnings("unused")
         public long getTimeLeft() {
             return endTime > 0 ? endTime - System.currentTimeMillis() : -1;
         }

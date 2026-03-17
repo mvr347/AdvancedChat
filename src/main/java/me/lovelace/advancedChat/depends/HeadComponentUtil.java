@@ -1,13 +1,9 @@
 package me.lovelace.advancedChat.depends;
 
 import net.kyori.adventure.text.Component;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.UUID;
 
 /**
@@ -15,8 +11,6 @@ import java.util.UUID;
  * Использует reflection, чтобы не зависеть от NMS на этапе компиляции.
  */
 public class HeadComponentUtil {
-
-    private static final UUID NIL_UUID = new UUID(0L, 0L);
 
     public static Component createHeadComponent(UUID uuid, String name, String textureValue, String textureSignature) {
                     try {
@@ -137,29 +131,6 @@ public class HeadComponentUtil {
 
                     return null;
                 }
-
-                private record ProfileInfo(UUID uuid, String name) {}
-
-                private static HeadComponentUtil.ProfileInfo extractProfileFromTexture(String textureValue) {
-                    try {
-                        byte[] decoded = Base64.getDecoder().decode(textureValue);
-                        String json = new String(decoded, StandardCharsets.UTF_8);
-                        JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
-                        String profileId = obj.has("profileId") ? obj.get("profileId").getAsString() : null;
-                        String profileName = obj.has("profileName") ? obj.get("profileName").getAsString() : null;
-                        UUID uuid = null;
-                        if (profileId != null && !profileId.isEmpty()) {
-                            String withDashes = profileId.replaceFirst(
-                                    "([0-9a-fA-F]{8})([0-9a-fA-F]{4})([0-9a-fA-F]{4})([0-9a-fA-F]{4})([0-9a-fA-F]+)",
-                                    "$1-$2-$3-$4-$5"
-                            );
-                            uuid = UUID.fromString(withDashes);
-                        }
-                        if (uuid == null && (profileName == null || profileName.isEmpty())) return null;
-            return new ProfileInfo(uuid, profileName);
-        } catch (Exception ignored) {}
-        return null;
-    }
 
     private static Object createPropertyMapWithProperty(Class<?> propertyMapClass, Class<?> propertyClass, Object property) {
         try {
@@ -405,16 +376,6 @@ public class HeadComponentUtil {
 
         debugMethods("PropertyMap", propsClass);
         return false;
-    }
-
-    private static Method findPropertyPutMethod(Class<?> propsClass, Class<?> propertyClass) {
-        Method method = findMethodByName(propsClass, "put", 2, propertyClass);
-        if (method != null) return method;
-        method = findMethodByName(propsClass, "put", 2, null);
-        if (method != null) return method;
-        method = findMethodByName(propsClass, "put", 1, propertyClass);
-        if (method != null) return method;
-        return null;
     }
 
     private static Method findMethod(Class<?> type, String name, int paramCount, Class<?> paramType) {

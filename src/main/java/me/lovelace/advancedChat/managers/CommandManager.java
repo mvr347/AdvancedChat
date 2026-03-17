@@ -18,6 +18,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
+@SuppressWarnings("RedundantReturnStatement")
 public class CommandManager implements CommandExecutor, TabCompleter {
     private final AdvancedChat plugin;
     private final MiniMessage mm = MiniMessage.miniMessage();
@@ -27,11 +28,13 @@ public class CommandManager implements CommandExecutor, TabCompleter {
     }
 
     @Override
+    @SuppressWarnings("NullableProblems")
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
         processCommand(sender, command, args);
         return true;
     }
 
+    @SuppressWarnings({"IfStatementWithTooManyBranches", "IfCanBeSwitch"})
     private void processCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String[] args) {
         if (sender instanceof Player p && plugin.isWorldDisabled(p.getWorld().getName())) {
             plugin.sendMessage(p, "world-disabled");
@@ -447,6 +450,7 @@ public class CommandManager implements CommandExecutor, TabCompleter {
 
     @Nullable
     @Override
+    @SuppressWarnings("NullableProblems")
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
         List<String> completions = new ArrayList<>();
 

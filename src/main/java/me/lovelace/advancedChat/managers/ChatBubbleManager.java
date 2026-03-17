@@ -207,7 +207,7 @@ public class ChatBubbleManager {
 
         private void hideFromSilentPlayers(@NotNull TextDisplay textDisplay) {
             Set<UUID> silentPlayers = plugin.getSilentPlayers();
-            if (silentPlayers == null || silentPlayers.isEmpty()) return;
+            if (silentPlayers.isEmpty()) return;
 
             for (UUID silentUuid : silentPlayers) {
                 Player silentPlayer = Bukkit.getPlayer(silentUuid);

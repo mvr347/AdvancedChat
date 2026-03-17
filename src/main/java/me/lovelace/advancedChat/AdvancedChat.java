@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Основной класс плагина AdvancedChat.
  * Строго оптимизирован под Paper API 1.21.11 (совместим с Folia) и Java 21.
  */
+@SuppressWarnings({"DuplicatedCode", "RedundantReturnStatement"})
 public final class AdvancedChat extends JavaPlugin {
 
     private static AdvancedChat instance;
@@ -142,8 +143,8 @@ public final class AdvancedChat extends JavaPlugin {
                 this,
                 task -> {
                     databaseManager.cleanOldMessages(deleteOlderThanMillis);
-                    databaseManager.cleanExpiredPinnedMessages();
-                    databaseManager.cleanOldPolls(86400);
+                    databaseManager.cleanExpiredPinnedMessages().thenAccept(ignored -> {});
+                    databaseManager.cleanOldPolls(86400).thenAccept(ignored -> {});
                     messageDataCache.cleanUp();
                     chatHistory.cleanUp();
                 },
@@ -229,7 +230,7 @@ public final class AdvancedChat extends JavaPlugin {
         try {
             List<ChatLine> history = chatHistory.get(player.getUniqueId(), () -> Collections.synchronizedList(new LinkedList<>()));
             synchronized (history) {
-                while (history.size() >= 100) history.remove(0);
+                trimHistory(history);
                 history.add(new ChatLine(messageId, component, false));
             }
         } catch (ExecutionException ignored) {}
@@ -238,7 +239,7 @@ public final class AdvancedChat extends JavaPlugin {
     }
 
     public @NotNull Component getClearChatComponent() { return clearChatComponent; }
-    public void clearChatForPlayer(@NotNull Player player, boolean keepStaff) {
+    public void clearChatForPlayer(@NotNull Player player, @SuppressWarnings("unused") boolean keepStaff) {
         if (isWorldDisabled(player.getWorld().getName())) return;
         player.sendMessage(clearChatComponent);
     }
@@ -249,6 +250,7 @@ public final class AdvancedChat extends JavaPlugin {
     public @NotNull Set<UUID> getSilentPlayers() { return silentPlayers; }
     public boolean isSilent(@NotNull UUID uuid) { return silentPlayers.contains(uuid); }
     public void toggleSilent(@NotNull UUID uuid) { if (!silentPlayers.remove(uuid)) silentPlayers.add(uuid); }
+    @SuppressWarnings("unused")
     public @NotNull Set<UUID> getSpyPlayers() { return spyPlayers; }
     public boolean isSpy(@NotNull UUID uuid) { return spyPlayers.contains(uuid); }
     public void toggleSpy(@NotNull UUID uuid) { if (!spyPlayers.remove(uuid)) spyPlayers.add(uuid); }
@@ -260,7 +262,7 @@ public final class AdvancedChat extends JavaPlugin {
     public void loadIgnores(@NotNull UUID uuid, @NotNull Set<UUID> ignores) { ignoredPlayers.computeIfAbsent(uuid, k -> ConcurrentHashMap.newKeySet()).addAll(ignores); }
     public boolean isWorldDisabled(@NotNull String worldName) {
         List<String> disabled = getConfig().getStringList("general.disabled-worlds");
-        if (disabled == null || disabled.isEmpty()) return false;
+        if (disabled.isEmpty()) return false;
         for (String w : disabled) {
             if (w != null && w.equalsIgnoreCase(worldName)) return true;
         }
@@ -285,10 +287,20 @@ public final class AdvancedChat extends JavaPlugin {
             List<ChatLine> history = chatHistory.get(player.getUniqueId(), () -> Collections.synchronizedList(new LinkedList<>()));
             // Обязательная синхронизация при пакетном изменении коллекции!
             synchronized (history) {
-                while (history.size() >= 100) history.remove(0);
+                trimHistory(history);
                 history.add(new ChatLine(messageId, component, true));
             }
         } catch (ExecutionException ignored) {}
+    }
+
+    private static void trimHistory(@NotNull List<ChatLine> history) {
+        while (history.size() >= 100) {
+            if (history instanceof Deque<?> deque) {
+                deque.removeFirst();
+            } else {
+                history.remove(0);
+            }
+        }
     }
 
     public void deleteMessageVisual(int messageId, @NotNull org.bukkit.command.CommandSender sender) {
@@ -409,7 +421,7 @@ public final class AdvancedChat extends JavaPlugin {
             } else {
                 propertiesJson = "\"properties\":[{\"name\":\"textures\",\"value\":\"" + skinProp.value() + "\"}]";
             }
-            String fakeUuid = HeadComponentUtil.makeSkinUuid(ownerName).toString();
+            String fakeUuid = String.valueOf(HeadComponentUtil.makeSkinUuid(ownerName));
             String fakeName = HeadComponentUtil.makeSkinName(ownerName);
             String headJson = "{\"text\":\"\",\"extra\":[{\"text\":\"\",\"type\":\"minecraft:player\",\"id\":\""
                     + fakeUuid
@@ -417,7 +429,7 @@ public final class AdvancedChat extends JavaPlugin {
             headComponent = GsonComponentSerializer.gson().deserialize(headJson);
         } else if (headComponent == null) {
             String headJson = "{\"text\":\"\",\"extra\":[{\"text\":\"\",\"type\":\"minecraft:player\",\"id\":\""
-                    + offlineOwner.getUniqueId().toString()
+                    + offlineOwner.getUniqueId()
                     + "\",\"name\":\"" + ownerName + "\"}]}";
             headComponent = GsonComponentSerializer.gson().deserialize(headJson);
         }

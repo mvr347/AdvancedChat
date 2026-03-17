@@ -7,8 +7,6 @@ import me.lovelace.advancedChat.managers.PinnedMessageManager;
 import me.lovelace.advancedChat.managers.PollManager;
 import me.lovelace.advancedChat.depends.CMISkinUtil;
 import net.kyori.adventure.text.Component;
-import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
@@ -17,8 +15,6 @@ import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -58,6 +54,7 @@ import java.util.concurrent.CompletableFuture;
  * @version 2.6
  * @since 1.0
  */
+@SuppressWarnings({"unused", "InstantiationOfUtilityClass"})
 public class AdvancedChatAPI {
 
     private static AdvancedChatAPI instance;
@@ -659,7 +656,7 @@ public class AdvancedChatAPI {
      * Очистить истёкшие закреплённые сообщения
      */
     public static void cleanExpiredPinnedMessages() {
-        AdvancedChat.getInstance().getDatabaseManager().cleanExpiredPinnedMessages();
+        AdvancedChat.getInstance().getDatabaseManager().cleanExpiredPinnedMessages().thenAccept(ignored -> {});
     }
 
     /**
@@ -667,13 +664,14 @@ public class AdvancedChatAPI {
      * @param olderThanSeconds Время в секундах
      */
     public static void cleanOldPolls(int olderThanSeconds) {
-        AdvancedChat.getInstance().getDatabaseManager().cleanOldPolls(olderThanSeconds);
+        AdvancedChat.getInstance().getDatabaseManager().cleanOldPolls(olderThanSeconds).thenAccept(ignored -> {});
     }
 
     // ========================================== //
     //              EVENTS API                    //
     // ========================================== //
 
+    @SuppressWarnings("unused")
     public static class AdvancedChatDeleteEvent extends Event {
         private static final HandlerList HANDLERS = new HandlerList();
         private final int messageId;
@@ -691,6 +689,7 @@ public class AdvancedChatAPI {
         public static HandlerList getHandlerList() { return HANDLERS; }
     }
 
+    @SuppressWarnings("unused")
     public static class AdvancedChatMentionEvent extends Event {
         private static final HandlerList HANDLERS = new HandlerList();
         private final Player sender;
@@ -709,6 +708,7 @@ public class AdvancedChatAPI {
         public static HandlerList getHandlerList() { return HANDLERS; }
     }
 
+    @SuppressWarnings("unused")
     public static class AdvancedChatMessageEditEvent extends Event implements Cancellable {
         private static final HandlerList HANDLERS = new HandlerList();
         private final Player player;
@@ -738,6 +738,7 @@ public class AdvancedChatAPI {
         public static HandlerList getHandlerList() { return HANDLERS; }
     }
 
+    @SuppressWarnings("unused")
     public static class AdvancedChatMessageEvent extends Event implements Cancellable {
         private static final HandlerList HANDLERS = new HandlerList();
         private final Player player;
@@ -764,6 +765,7 @@ public class AdvancedChatAPI {
         public static HandlerList getHandlerList() { return HANDLERS; }
     }
 
+    @SuppressWarnings("unused")
     public static class AdvancedChatPinMessageEvent extends Event implements Cancellable {
         private static final HandlerList HANDLERS = new HandlerList();
         private final Player player;
@@ -794,6 +796,7 @@ public class AdvancedChatAPI {
         public static HandlerList getHandlerList() { return HANDLERS; }
     }
 
+    @SuppressWarnings("unused")
     public static class AdvancedChatPollCreateEvent extends Event implements Cancellable {
         private static final HandlerList HANDLERS = new HandlerList();
         private final Player player;
@@ -824,6 +827,7 @@ public class AdvancedChatAPI {
         public static HandlerList getHandlerList() { return HANDLERS; }
     }
 
+    @SuppressWarnings("unused")
     public static class AdvancedChatPollVoteEvent extends Event implements Cancellable {
         private static final HandlerList HANDLERS = new HandlerList();
         private final Player player;
@@ -851,6 +855,7 @@ public class AdvancedChatAPI {
         public static HandlerList getHandlerList() { return HANDLERS; }
     }
 
+    @SuppressWarnings("unused")
     public static class AdvancedChatPollEndEvent extends Event {
         private static final HandlerList HANDLERS = new HandlerList();
         private final int pollId;
@@ -875,6 +880,7 @@ public class AdvancedChatAPI {
         public static HandlerList getHandlerList() { return HANDLERS; }
     }
 
+    @SuppressWarnings("unused")
     public static class CMISkinChangeEvent extends Event {
         private static final HandlerList HANDLERS = new HandlerList();
         private final Player player;
