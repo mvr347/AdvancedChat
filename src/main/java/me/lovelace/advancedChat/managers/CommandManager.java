@@ -33,6 +33,10 @@ public class CommandManager implements CommandExecutor, TabCompleter {
     }
 
     private void processCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String[] args) {
+        if (sender instanceof Player p && plugin.isWorldDisabled(p.getWorld().getName())) {
+            plugin.sendMessage(p, "world-disabled");
+            return;
+        }
         boolean isAchCmd = command.getName().equalsIgnoreCase("ach") || command.getName().equalsIgnoreCase("chat");
         boolean isSilentCmd = command.getName().equalsIgnoreCase("silent") || (isAchCmd && args.length >= 1 && args[0].equalsIgnoreCase("silent"));
         boolean isTagToggleCmd = command.getName().equalsIgnoreCase("tagtoggle") || (isAchCmd && args.length >= 1 && args[0].equalsIgnoreCase("tagtoggle"));

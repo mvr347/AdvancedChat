@@ -75,6 +75,7 @@ public class ChatBubbleManager {
 
     public void showBubble(@NotNull Player player, @NotNull String rawMessage, @NotNull String channel) {
         if (!enabled) return;
+        if (plugin.isWorldDisabled(player.getWorld().getName())) return;
 
         if (!allowedChannels.contains(channel)) {
             return;

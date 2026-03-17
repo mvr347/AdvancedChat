@@ -33,6 +33,9 @@ public class ProtocolLibHook {
             @Override
             public void onPacketSending(PacketEvent event) {
                 Player player = event.getPlayer();
+                if (advancedChat.isWorldDisabled(player.getWorld().getName())) {
+                    return;
+                }
 
                 // Игнорируем Action Bar сообщения (чтобы они не дублировались в историю чата)
                 if (event.getPacketType() == PacketType.Play.Server.SYSTEM_CHAT) {

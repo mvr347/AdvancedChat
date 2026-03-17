@@ -14,6 +14,9 @@ general:
   enabled: true
   # Режим отладки (логи в консоль)
   debug: false
+  # Список миров, где плагин полностью отключен
+  # Пример: ["world_nether", "minigames"]
+  disabled-worlds: []
 
 # ========================================== #
 #           НАСТРОЙКИ ЧАТА                   #
@@ -71,7 +74,7 @@ colors:
     local:
       prefix: ""
       radius: 200
-      format: "<delete_edit_buttons><gray>[L] </gray><hover:show_text:'<gray>Кликни для /msg %player_name%'><click:suggest_command:'/msg %player_name% '><player></click></hover>: <white><message></white>"
+      format: "<delete_edit_buttons><gray>[L] </gray><hover:show_text:'<gray>Кликни для /msg %player_name%'><click:suggest_command:'/msg %player_name%'> <player></click></hover>: <white><message></white>"
       permission: "advancedchat.local"
       command:
         - local
@@ -83,7 +86,7 @@ colors:
     global:
       prefix: "!"
       radius: -1
-      format: "<delete_edit_buttons><yellow>[G] </yellow><hover:show_text:'<gray>Кликни для /msg %player_name%'><click:suggest_command:'/msg %player_name% '><player></click></hover>: <gradient:#FFAA00:#FF0000><message></gradient>"
+      format: "<delete_edit_buttons><yellow>[G] </yellow><hover:show_text:'<gray>Кликни для /msg %player_name%'><click:suggest_command:'/msg %player_name%'> <player></click></hover>: <gradient:#FFAA00:#FF0000><message></gradient>"
       permission: "advancedchat.global"
       command:
         - global
@@ -93,7 +96,7 @@ colors:
     admin:
       prefix: "adm"
       radius: -1
-      format: "<delete_edit_buttons><red>[A] </red><hover:show_text:'<red>Администратор'><click:suggest_command:'/msg %player_name% '><player></click></hover>: <red><message></red>"
+      format: "<delete_edit_buttons><red>[A] </red><hover:show_text:'<red>Администратор'><click:suggest_command:'/msg %player_name%'> <player></click></hover>: <red><message></red>"
       permission: "advancedchat.admin"
       command:
         - adm

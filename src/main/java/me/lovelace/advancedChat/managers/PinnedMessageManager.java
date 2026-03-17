@@ -189,15 +189,16 @@ public class PinnedMessageManager {
             hideBossBarFromAll(pinned.bossBar);
             pinned.cancelTask();
 
-            if (pinned.duration > 0) {
-                String expiredFormat = plugin.getRawMsg("pin-expired")
-                    .replace("{messageId}", String.valueOf(pinned.messageId));
-                Component expiredComponent = miniMessage.deserialize(expiredFormat);
-                for (Player p : Bukkit.getOnlinePlayers()) {
-                    if (!plugin.isSilent(p.getUniqueId())) {
-                        p.sendMessage(expiredComponent);
-                    }
+        if (pinned.duration > 0) {
+            String expiredFormat = plugin.getRawMsg("pin-expired")
+                .replace("{messageId}", String.valueOf(pinned.messageId));
+            Component expiredComponent = miniMessage.deserialize(expiredFormat);
+            for (Player p : Bukkit.getOnlinePlayers()) {
+                if (plugin.isWorldDisabled(p.getWorld().getName())) continue;
+                if (!plugin.isSilent(p.getUniqueId())) {
+                    p.sendMessage(expiredComponent);
                 }
+            }
             }
         }
     }
@@ -224,6 +225,9 @@ public class PinnedMessageManager {
     private void showBossBarToAll(@NotNull BossBar bossBar) {
         Set<UUID> silentPlayers = plugin.getSilentPlayers();
         for (Player p : Bukkit.getOnlinePlayers()) {
+            if (plugin.isWorldDisabled(p.getWorld().getName())) {
+                continue;
+            }
             if (silentPlayers != null && silentPlayers.contains(p.getUniqueId())) {
                 continue;
             }
@@ -274,6 +278,7 @@ public class PinnedMessageManager {
      */
     public void showActiveBars(@NotNull Player player) {
         if (!enabled) return;
+        if (plugin.isWorldDisabled(player.getWorld().getName())) return;
 
         Set<UUID> silentPlayers = plugin.getSilentPlayers();
         if (silentPlayers != null && silentPlayers.contains(player.getUniqueId())) {

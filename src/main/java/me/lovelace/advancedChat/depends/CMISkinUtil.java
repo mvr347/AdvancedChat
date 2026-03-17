@@ -9,6 +9,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.SkullMeta;
 
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -24,6 +26,8 @@ public class CMISkinUtil {
     private static Method getSkinByUuidMethod = null;
     private static Method getSkinByNameMethod = null;
     private static Class<?> skinManagerClass = null;
+
+    public record SkinProperty(String value, String signature) {}
 
     public static void init() {
         if (Bukkit.getPluginManager().isPluginEnabled("CMI")) {
@@ -134,13 +138,19 @@ public class CMISkinUtil {
                         Method getValueMethod = skinClass.getMethod("getValue");
                         texture = (String) getValueMethod.invoke(skin);
                     } catch (NoSuchMethodException ex) {
-                        // Метод не найден
+                        try {
+                            Method getSkinMethod = skinClass.getMethod("getSkin");
+                            texture = (String) getSkinMethod.invoke(skin);
+                        } catch (NoSuchMethodException ignored) {
+                            // Метод не найден
+                        }
                     }
                 }
                 
                 if (texture != null && !texture.isEmpty()) {
-                    skinCache.put(uuid, texture);
-                    return texture;
+                    String normalized = normalizeTextureValue(texture);
+                    skinCache.put(uuid, normalized);
+                    return normalized;
                 }
             }
 
@@ -154,10 +164,21 @@ public class CMISkinUtil {
                         Method getTextureMethod = skinClass.getMethod("getTexture");
                         String texture = (String) getTextureMethod.invoke(skinByName);
                         if (texture != null && !texture.isEmpty()) {
-                            skinCache.put(uuid, texture);
-                            return texture;
+                            String normalized = normalizeTextureValue(texture);
+                            skinCache.put(uuid, normalized);
+                            return normalized;
                         }
-                    } catch (NoSuchMethodException ignored) {}
+                    } catch (NoSuchMethodException ignored) {
+                        try {
+                            Method getSkinMethod = skinClass.getMethod("getSkin");
+                            String texture = (String) getSkinMethod.invoke(skinByName);
+                            if (texture != null && !texture.isEmpty()) {
+                                String normalized = normalizeTextureValue(texture);
+                                skinCache.put(uuid, normalized);
+                                return normalized;
+                            }
+                        } catch (NoSuchMethodException ignored2) {}
+                    }
                 }
             }
         } catch (Exception e) {
@@ -166,6 +187,29 @@ public class CMISkinUtil {
         }
 
         return null;
+    }
+
+    public static SkinProperty getSkinProperty(UUID uuid, String playerName) {
+        Player player = Bukkit.getPlayer(uuid);
+        if (player != null) {
+            SkinProperty fromProfile = getSkinPropertyFromProfile(player);
+            if (fromProfile != null && fromProfile.value() != null && !fromProfile.value().isEmpty()) {
+                return fromProfile;
+            }
+        }
+        SkinProperty fromCmi = getSkinPropertyFromCmi(uuid, playerName);
+        if (fromCmi != null && fromCmi.value() != null && !fromCmi.value().isEmpty()) {
+            return fromCmi;
+        }
+        return null;
+    }
+
+    public static SkinProperty getSkinProperty(Player player) {
+        SkinProperty fromProfile = getSkinPropertyFromProfile(player);
+        if (fromProfile != null && fromProfile.value() != null && !fromProfile.value().isEmpty()) {
+            return fromProfile;
+        }
+        return getSkinPropertyFromCmi(player.getUniqueId(), player.getName());
     }
 
     @SuppressWarnings("deprecation")
@@ -210,6 +254,319 @@ public class CMISkinUtil {
         }
         // CMI уже возвращает текстуру в Base64 формате
         return texture;
+    }
+
+    private static SkinProperty getSkinPropertyFromCmi(UUID uuid, String playerName) {
+        if (!isCMIAvailable() || getSkinByUuidMethod == null) {
+            return getSkinPropertyFromCmiCache(uuid, playerName);
+        }
+
+        try {
+            SkinProperty cached = getSkinPropertyFromCmiCache(uuid, playerName);
+            if (cached != null && cached.value() != null && !cached.value().isEmpty()) {
+                skinCache.put(uuid, cached.value());
+                logSkinDebug("CMI_CACHE", uuid, playerName, cached);
+                return cached;
+            }
+
+            Object skin = null;
+
+            if (getSkinByUuidMethod.getParameterCount() == 1 &&
+                    getSkinByUuidMethod.getParameterTypes()[0] == UUID.class) {
+                skin = getSkinByUuidMethod.invoke(skinManagerInstance, uuid);
+            } else if (getSkinByUuidMethod.getParameterCount() == 1 &&
+                    getSkinByUuidMethod.getParameterTypes()[0] == String.class) {
+                skin = getSkinByUuidMethod.invoke(skinManagerInstance, uuid.toString());
+            }
+
+            if (skin == null && getSkinByNameMethod != null && playerName != null) {
+                skin = getSkinByNameMethod.invoke(skinManagerInstance, playerName);
+            }
+
+            if (skin == null) {
+                skin = tryResolveSkinByAnyMethod(uuid, playerName);
+            }
+
+            SkinProperty prop = extractSkinPropertyFromObject(skin);
+            if (prop != null && prop.value() != null && !prop.value().isEmpty()) {
+                skinCache.put(uuid, prop.value());
+                logSkinDebug("CMI", uuid, playerName, prop);
+                return prop;
+            }
+            logSkinDebugMiss("CMI", uuid, playerName, skin);
+        } catch (Exception ignored) {}
+
+        return null;
+    }
+
+    private static SkinProperty getSkinPropertyFromCmiCache(UUID uuid, String playerName) {
+        try {
+            Class<?> cmiLibClass = Class.forName("net.Zrips.CMILib.CMILib");
+            Object cmiLibInstance = cmiLibClass.getMethod("getInstance").invoke(null);
+            Object skinManager = cmiLibClass.getMethod("getSkinManager").invoke(cmiLibInstance);
+            if (skinManager == null) return null;
+
+            Object skin = null;
+            try {
+                var byNameField = skinManager.getClass().getField("skinCacheByName");
+                Object byNameObj = byNameField.get(skinManager);
+                if (byNameObj instanceof java.util.Map<?, ?> byName && playerName != null) {
+                    skin = byName.get(playerName);
+                }
+            } catch (NoSuchFieldException ignored) {}
+
+            if (skin == null) {
+                try {
+                    var byUuidField = skinManager.getClass().getField("skinCacheByUUID");
+                    Object byUuidObj = byUuidField.get(skinManager);
+                    if (byUuidObj instanceof java.util.Map<?, ?> byUuid) {
+                        skin = byUuid.get(uuid);
+                    }
+                } catch (NoSuchFieldException ignored) {}
+            }
+
+            SkinProperty prop = extractSkinPropertyFromObject(skin);
+            if (prop != null && prop.value() != null && !prop.value().isEmpty()) {
+                return prop;
+            }
+            logSkinDebugMiss("CMI_CACHE", uuid, playerName, skin);
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    private static SkinProperty getSkinPropertyFromProfile(Player player) {
+        try {
+            Object profile = player.getClass().getMethod("getPlayerProfile").invoke(player);
+            if (profile == null) return null;
+            Object properties = profile.getClass().getMethod("getProperties").invoke(profile);
+            if (properties instanceof Iterable<?> iterable) {
+                for (Object property : iterable) {
+                    if (property == null) continue;
+                    String name = (String) property.getClass().getMethod("getName").invoke(property);
+                    if (!"textures".equalsIgnoreCase(name)) continue;
+                    String value = (String) property.getClass().getMethod("getValue").invoke(property);
+                    String signature = null;
+                    try {
+                        signature = (String) property.getClass().getMethod("getSignature").invoke(property);
+                    } catch (NoSuchMethodException ignored) {}
+                    if (value != null && !value.isEmpty()) {
+                        SkinProperty prop = new SkinProperty(normalizeTextureValue(value), signature);
+                        logSkinDebug("PROFILE", player.getUniqueId(), player.getName(), prop);
+                        return prop;
+                    }
+                }
+            }
+            logSkinDebugMiss("PROFILE", player.getUniqueId(), player.getName(), properties);
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    private static String invokeSkinString(Class<?> skinClass, Object skin, String... methodNames) {
+        for (String methodName : methodNames) {
+            try {
+                Method method = skinClass.getMethod(methodName);
+                Object result = method.invoke(skin);
+                if (result instanceof String str && !str.isEmpty()) {
+                    return str;
+                }
+            } catch (NoSuchMethodException ignored) {
+            } catch (Exception e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private static Object tryResolveSkinByAnyMethod(UUID uuid, String playerName) {
+        try {
+            for (Method method : skinManagerClass.getMethods()) {
+                String name = method.getName().toLowerCase();
+                if (!name.contains("skin")) continue;
+                if (method.getParameterCount() != 1) continue;
+                Class<?> param = method.getParameterTypes()[0];
+                try {
+                    if (param == UUID.class) {
+                        return method.invoke(skinManagerInstance, uuid);
+                    }
+                    if (param == String.class && playerName != null) {
+                        return method.invoke(skinManagerInstance, playerName);
+                    }
+                    if (param == Player.class) {
+                        Player p = Bukkit.getPlayer(uuid);
+                        if (p != null) return method.invoke(skinManagerInstance, p);
+                    }
+                } catch (Exception ignored) {}
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    private static SkinProperty extractSkinPropertyFromObject(Object skin) {
+        if (skin == null) return null;
+
+        if (skin instanceof String str && !str.isEmpty()) {
+            return new SkinProperty(normalizeTextureValue(str), null);
+        }
+
+        Class<?> skinClass = skin.getClass();
+        String className = skinClass.getName().toLowerCase();
+
+        if (className.endsWith("property")) {
+            String value = invokeSkinString(skinClass, skin, "getValue");
+            if (value != null && !value.isEmpty()) {
+                String signature = invokeSkinString(skinClass, skin, "getSignature");
+                return new SkinProperty(normalizeTextureValue(value), signature);
+            }
+        }
+
+        try {
+            Method getProperties = skinClass.getMethod("getProperties");
+            Object properties = getProperties.invoke(skin);
+            SkinProperty fromProps = extractSkinPropertyFromProperties(properties);
+            if (fromProps != null) return fromProps;
+        } catch (Exception ignored) {}
+
+        try {
+            Method getTextures = skinClass.getMethod("getTextures");
+            Object textures = getTextures.invoke(skin);
+            SkinProperty fromTextures = extractSkinPropertyFromProperties(textures);
+            if (fromTextures != null) return fromTextures;
+        } catch (Exception ignored) {}
+
+        String value = invokeSkinString(skinClass, skin, "getTexture", "getValue", "getSkin", "getBase64", "getData");
+        if (value != null && !value.isEmpty()) {
+            String signature = invokeSkinString(skinClass, skin, "getSignature", "getSkinSignature", "getSig");
+            return new SkinProperty(normalizeTextureValue(value), signature);
+        }
+
+        try {
+            var field = skinClass.getDeclaredField("value");
+            field.setAccessible(true);
+            Object val = field.get(skin);
+            if (val instanceof String str && !str.isEmpty()) {
+                String signature = null;
+                try {
+                    var sigField = skinClass.getDeclaredField("signature");
+                    sigField.setAccessible(true);
+                    Object sigVal = sigField.get(skin);
+                    if (sigVal instanceof String sig && !sig.isEmpty()) signature = sig;
+                } catch (Exception ignored) {}
+                return new SkinProperty(normalizeTextureValue(str), signature);
+            }
+        } catch (Exception ignored) {}
+
+        return null;
+    }
+
+    private static SkinProperty extractSkinPropertyFromProperties(Object properties) {
+        if (properties == null) return null;
+        if (properties instanceof Iterable<?> iterable) {
+            for (Object prop : iterable) {
+                if (prop == null) continue;
+                try {
+                    String name = (String) prop.getClass().getMethod("getName").invoke(prop);
+                    if (!"textures".equalsIgnoreCase(name)) continue;
+                    String value = (String) prop.getClass().getMethod("getValue").invoke(prop);
+                    String signature = null;
+                    try {
+                        signature = (String) prop.getClass().getMethod("getSignature").invoke(prop);
+                    } catch (NoSuchMethodException ignored) {}
+                    if (value != null && !value.isEmpty()) {
+                        return new SkinProperty(normalizeTextureValue(value), signature);
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
+        return null;
+    }
+
+    private static String normalizeTextureValue(String value) {
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) return trimmed;
+
+        String decoded = tryDecodeBase64(trimmed);
+        if (decoded != null && decoded.contains("\"textures\"")) {
+            return trimmed;
+        }
+
+        if (trimmed.startsWith("{") && trimmed.contains("\"textures\"")) {
+            return Base64.getEncoder().encodeToString(trimmed.getBytes(StandardCharsets.UTF_8));
+        }
+
+        String urlPrefixHttp = "http://textures.minecraft.net/texture/";
+        String urlPrefixHttps = "https://textures.minecraft.net/texture/";
+        if (trimmed.startsWith(urlPrefixHttp) || trimmed.startsWith(urlPrefixHttps)) {
+            String hash = trimmed.substring(trimmed.lastIndexOf('/') + 1);
+            return encodeTextureHash(hash);
+        }
+
+        if (trimmed.matches("^[0-9a-fA-F]{32,}$")) {
+            return encodeTextureHash(trimmed);
+        }
+
+        return trimmed;
+    }
+
+    private static void logSkinDebug(String source, UUID uuid, String playerName, SkinProperty prop) {
+        try {
+            if (!AdvancedChat.getInstance().getConfig().getBoolean("general.debug", false)) return;
+        } catch (Exception ignored) {
+            return;
+        }
+        String value = prop.value();
+        String signature = prop.signature();
+        String valueKind;
+        if (value == null || value.isEmpty()) {
+            valueKind = "empty";
+        } else if (value.startsWith("http://textures.minecraft.net/texture/")
+                || value.startsWith("https://textures.minecraft.net/texture/")) {
+            valueKind = "url";
+        } else if (value.matches("^[0-9a-fA-F]{32,}$")) {
+            valueKind = "hash";
+        } else {
+            String decoded = tryDecodeBase64(value);
+            valueKind = (decoded != null && decoded.contains("\"textures\"")) ? "base64" : "unknown";
+        }
+        AdvancedChat.getInstance().getLogger().info(
+                "[SkinDebug] source=" + source
+                        + " player=" + (playerName != null ? playerName : "null")
+                        + " uuid=" + uuid
+                        + " valueKind=" + valueKind
+                        + " valueLen=" + (value != null ? value.length() : 0)
+                        + " signature=" + (signature != null && !signature.isEmpty())
+        );
+    }
+
+    private static void logSkinDebugMiss(String source, UUID uuid, String playerName, Object skinObj) {
+        try {
+            if (!AdvancedChat.getInstance().getConfig().getBoolean("general.debug", false)) return;
+        } catch (Exception ignored) {
+            return;
+        }
+        String skinClass = (skinObj != null) ? skinObj.getClass().getName() : "null";
+        AdvancedChat.getInstance().getLogger().info(
+                "[SkinDebug] source=" + source
+                        + " player=" + (playerName != null ? playerName : "null")
+                        + " uuid=" + uuid
+                        + " no-texture class=" + skinClass
+        );
+    }
+
+    private static String encodeTextureHash(String hash) {
+        String url = "http://textures.minecraft.net/texture/" + hash;
+        String json = "{\"textures\":{\"SKIN\":{\"url\":\"" + url + "\"}}}";
+        return Base64.getEncoder().encodeToString(json.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String tryDecodeBase64(String value) {
+        try {
+            byte[] bytes = Base64.getDecoder().decode(value);
+            String decoded = new String(bytes, StandardCharsets.UTF_8);
+            if (decoded.startsWith("{") && decoded.contains("textures")) {
+                return decoded;
+            }
+        } catch (IllegalArgumentException ignored) {}
+        return null;
     }
 
     /**

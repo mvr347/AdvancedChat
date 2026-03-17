@@ -14,6 +14,8 @@ import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
+import net.kyori.adventure.key.Key;
+import me.lovelace.advancedChat.depends.HeadComponentUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandExecutor;
@@ -223,6 +225,7 @@ public final class AdvancedChat extends JavaPlugin {
     public @NotNull Cache<Integer, MessageData> getMessageDataCache() { return messageDataCache; }
 
     public void addChatLineAndSend(@NotNull Player player, int messageId, @NotNull Component component) {
+        if (isWorldDisabled(player.getWorld().getName())) return;
         try {
             List<ChatLine> history = chatHistory.get(player.getUniqueId(), () -> Collections.synchronizedList(new LinkedList<>()));
             synchronized (history) {
@@ -235,7 +238,10 @@ public final class AdvancedChat extends JavaPlugin {
     }
 
     public @NotNull Component getClearChatComponent() { return clearChatComponent; }
-    public void clearChatForPlayer(@NotNull Player player, boolean keepStaff) { player.sendMessage(clearChatComponent); }
+    public void clearChatForPlayer(@NotNull Player player, boolean keepStaff) {
+        if (isWorldDisabled(player.getWorld().getName())) return;
+        player.sendMessage(clearChatComponent);
+    }
     public @NotNull Map<String, Integer> getCustomChannels() { return customChannels; }
     public @NotNull String getDefaultChannel(@NotNull UUID uuid) { return defaultChannels.getOrDefault(uuid, "local"); }
     public void setDefaultChannel(@NotNull UUID uuid, @NotNull String channel) { defaultChannels.put(uuid, channel); }
@@ -252,6 +258,14 @@ public final class AdvancedChat extends JavaPlugin {
     public boolean isIgnoring(@NotNull UUID ignorer, @NotNull UUID ignored) { Set<UUID> ignoredSet = ignoredPlayers.get(ignorer); return ignoredSet != null && ignoredSet.contains(ignored); }
     public void toggleIgnore(@NotNull UUID ignorer, @NotNull UUID ignored) { Set<UUID> ignoredSet = ignoredPlayers.computeIfAbsent(ignorer, k -> ConcurrentHashMap.newKeySet()); if (!ignoredSet.remove(ignored)) ignoredSet.add(ignored); }
     public void loadIgnores(@NotNull UUID uuid, @NotNull Set<UUID> ignores) { ignoredPlayers.computeIfAbsent(uuid, k -> ConcurrentHashMap.newKeySet()).addAll(ignores); }
+    public boolean isWorldDisabled(@NotNull String worldName) {
+        List<String> disabled = getConfig().getStringList("general.disabled-worlds");
+        if (disabled == null || disabled.isEmpty()) return false;
+        for (String w : disabled) {
+            if (w != null && w.equalsIgnoreCase(worldName)) return true;
+        }
+        return false;
+    }
     public @NotNull DatabaseManager getDatabaseManager() { return databaseManager; }
     public @NotNull ChatBubbleManager getChatBubbleManager() { return chatBubbleManager; }
     public @NotNull PinnedMessageManager getPinnedMessageManager() { return pinnedMessageManager; }
@@ -265,6 +279,7 @@ public final class AdvancedChat extends JavaPlugin {
     }
 
     public void recordSystemMessageFromPacket(Player player, Component component) {
+        if (isWorldDisabled(player.getWorld().getName())) return;
         int messageId = getNextMessageId();
         try {
             List<ChatLine> history = chatHistory.get(player.getUniqueId(), () -> Collections.synchronizedList(new LinkedList<>()));
@@ -290,6 +305,9 @@ public final class AdvancedChat extends JavaPlugin {
         );
 
         for (Player p : Bukkit.getOnlinePlayers()) {
+            if (isWorldDisabled(p.getWorld().getName())) {
+                continue;
+            }
             List<ChatLine> history = chatHistory.getIfPresent(p.getUniqueId());
             if (history == null) continue;
 
@@ -356,6 +374,7 @@ public final class AdvancedChat extends JavaPlugin {
         if (Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
             format = PlaceholderAPI.setPlaceholders(offlineOwner, format);
         }
+        format = stripPlayerHoverClick(format);
 
         if (!editor.hasPermission("advancedchat.color")) {
             finalText = MiniMessage.miniMessage().escapeTags(finalText);
@@ -372,21 +391,39 @@ public final class AdvancedChat extends JavaPlugin {
 
         // Создаём компонент игрока: голова + имя с hover/click
         // Пытаемся получить кастомный скин из CMI
-        String cmiTexture = me.lovelace.advancedChat.depends.CMISkinUtil.getSkinTextureBase64(offlineOwner.getUniqueId());
-        Component headComponent;
+        me.lovelace.advancedChat.depends.CMISkinUtil.SkinProperty skinProp =
+                me.lovelace.advancedChat.depends.CMISkinUtil.getSkinProperty(offlineOwner.getUniqueId(), ownerName);
+        String skinSignature = skinProp != null ? skinProp.signature() : null;
+        Component headComponent = HeadComponentUtil.createHeadComponent(
+                offlineOwner.getUniqueId(),
+                ownerName,
+                skinProp != null ? skinProp.value() : null,
+                skinSignature
+        );
 
-        if (cmiTexture != null && !cmiTexture.isEmpty()) {
-            // Используем кастомный скин из CMI через NBT-текстуру
-            String headJson = "{\"text\":\"\",\"extra\":[{\"text\":\"\",\"type\":\"minecraft:player\",\"id\":\"" + offlineOwner.getUniqueId().toString() + "\",\"properties\":[{\"name\":\"textures\",\"value\":\"" + cmiTexture + "\"}]}]}";
+        if (headComponent == null && skinProp != null && skinProp.value() != null && !skinProp.value().isEmpty()) {
+            String propertiesJson;
+            if (skinProp.signature() != null && !skinProp.signature().isEmpty()) {
+                propertiesJson = "\"properties\":[{\"name\":\"textures\",\"value\":\"" + skinProp.value()
+                        + "\",\"signature\":\"" + skinProp.signature() + "\"}]";
+            } else {
+                propertiesJson = "\"properties\":[{\"name\":\"textures\",\"value\":\"" + skinProp.value() + "\"}]";
+            }
+            String fakeUuid = HeadComponentUtil.makeSkinUuid(ownerName).toString();
+            String fakeName = HeadComponentUtil.makeSkinName(ownerName);
+            String headJson = "{\"text\":\"\",\"extra\":[{\"text\":\"\",\"type\":\"minecraft:player\",\"id\":\""
+                    + fakeUuid
+                    + "\",\"name\":\"" + fakeName + "\"," + propertiesJson + "}]}";
             headComponent = GsonComponentSerializer.gson().deserialize(headJson);
-        } else {
-            // Стандартная голова через Minecraft профиль
-            String headJson = "{\"text\":\"\",\"extra\":[{\"text\":\"\",\"type\":\"minecraft:player\",\"id\":\"" + offlineOwner.getUniqueId().toString() + "\"}]}";
+        } else if (headComponent == null) {
+            String headJson = "{\"text\":\"\",\"extra\":[{\"text\":\"\",\"type\":\"minecraft:player\",\"id\":\""
+                    + offlineOwner.getUniqueId().toString()
+                    + "\",\"name\":\"" + ownerName + "\"}]}";
             headComponent = GsonComponentSerializer.gson().deserialize(headJson);
         }
 
         // Имя игрока
-        Component playerDisplay = Component.text(ownerName);
+        Component playerDisplay = Component.text(ownerName).font(Key.key("minecraft:default"));
 
         // Полный компонент: голова + пробел + имя с hover/click
         Component interactivePlayer = Component.empty()
@@ -420,6 +457,9 @@ public final class AdvancedChat extends JavaPlugin {
         UUID ownerUuid = data.owner();
 
         for (Player p : Bukkit.getOnlinePlayers()) {
+            if (isWorldDisabled(p.getWorld().getName())) {
+                continue;
+            }
             List<ChatLine> history = chatHistory.getIfPresent(p.getUniqueId());
             if (history == null) continue;
 
@@ -479,4 +519,14 @@ public final class AdvancedChat extends JavaPlugin {
 
     public @Nullable EditSession getEditSession(UUID uuid) { return activeEditSessions.get(uuid); }
     public void removeEditSession(UUID uuid) { activeEditSessions.remove(uuid); }
+
+    private static String stripPlayerHoverClick(String format) {
+        if (format == null || format.isEmpty()) return format;
+        String out = format;
+        out = out.replaceAll("(?is)<hover:[^>]*>\\s*<click:[^>]*>\\s*<player>\\s*</click>\\s*</hover>", "<player>");
+        out = out.replaceAll("(?is)<click:[^>]*>\\s*<hover:[^>]*>\\s*<player>\\s*</hover>\\s*</click>", "<player>");
+        out = out.replaceAll("(?is)<hover:[^>]*>\\s*<player>\\s*</hover>", "<player>");
+        out = out.replaceAll("(?is)<click:[^>]*>\\s*<player>\\s*</click>", "<player>");
+        return out;
+    }
 }

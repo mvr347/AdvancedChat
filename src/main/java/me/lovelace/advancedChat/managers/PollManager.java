@@ -249,6 +249,7 @@ public class PollManager {
      * Трансляция опроса конкретному игроку
      */
     private void broadcastPollToPlayer(@NotNull Player player, @NotNull PollData poll) {
+        if (plugin.isWorldDisabled(player.getWorld().getName())) return;
         String questionFormat = plugin.getRawMsg("poll-question-format")
             .replace("{id}", String.valueOf(poll.id))
             .replace("<question>", poll.question)
@@ -312,6 +313,7 @@ public class PollManager {
 
         Component resultsComp = miniMessage.deserialize(results.toString());
         for (Player p : Bukkit.getOnlinePlayers()) {
+            if (plugin.isWorldDisabled(p.getWorld().getName())) continue;
             p.sendMessage(resultsComp);
             try {
                 p.playSound(p.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
@@ -345,6 +347,7 @@ public class PollManager {
         Component optionsComp = miniMessage.deserialize(optionsText.toString());
 
         for (Player p : Bukkit.getOnlinePlayers()) {
+            if (plugin.isWorldDisabled(p.getWorld().getName())) continue;
             p.sendMessage(questionComp);
             p.sendMessage(optionsComp);
         }
@@ -375,7 +378,11 @@ public class PollManager {
                         plugin.getDatabaseManager().endPoll(pollId);
                         String endFormat = plugin.getRawMsg("poll-ended-format").replace("{id}", String.valueOf(pollId));
                         Component endComponent = miniMessage.deserialize(endFormat);
-                        Bukkit.broadcastMessage(PlainTextComponentSerializer.plainText().serialize(endComponent));
+                        String endPlain = PlainTextComponentSerializer.plainText().serialize(endComponent);
+                        for (Player p : Bukkit.getOnlinePlayers()) {
+                            if (plugin.isWorldDisabled(p.getWorld().getName())) continue;
+                            p.sendMessage(endPlain);
+                        }
                     }
                 }
             },

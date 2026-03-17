@@ -17,6 +17,7 @@ reload-success: "<green>Конфигурация успешно перезагр
 reload-messages-success: "<green>Сообщения успешно перезагружены!</green>"
 player-not-found: "<red>Игрок не найден!</red>"
 player-only: "<red>Эта команда только для игроков!</red>"
+world-disabled: "<red>AdvancedChat отключен в этом мире.</red>"
 
 # ========================================== #
 #         КАНАЛЫ ЧАТА                        #

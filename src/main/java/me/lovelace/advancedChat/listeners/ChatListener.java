@@ -31,6 +31,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import me.lovelace.advancedChat.depends.HeadComponentUtil;
 
 public class ChatListener implements Listener {
     private final AdvancedChat plugin;
@@ -79,6 +80,7 @@ public class ChatListener implements Listener {
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onModernChat(@NotNull AsyncChatEvent event) {
         Player player = event.getPlayer();
+        if (plugin.isWorldDisabled(player.getWorld().getName())) return;
         String rawMessage = PlainTextComponentSerializer.plainText().serialize(event.message());
 
         AdvancedChat.EditSession session = plugin.getEditSession(player.getUniqueId());
@@ -236,13 +238,14 @@ public class ChatListener implements Listener {
 
                             everyoneCooldowns.put(player.getUniqueId(), System.currentTimeMillis());
 
-                            for (Player p : Bukkit.getOnlinePlayers()) {
-                                if (p.equals(player)) continue;
-                                if (plugin.hasTagsDisabled(p.getUniqueId())) continue;
-                                if (finalRadius != -1 && (!p.getWorld().equals(senderLoc.getWorld()) || p.getLocation().distanceSquared(senderLoc) > finalRadius * finalRadius)) continue;
+                        for (Player p : Bukkit.getOnlinePlayers()) {
+                            if (p.equals(player)) continue;
+                            if (plugin.isWorldDisabled(p.getWorld().getName())) continue;
+                            if (plugin.hasTagsDisabled(p.getUniqueId())) continue;
+                            if (finalRadius != -1 && (!p.getWorld().equals(senderLoc.getWorld()) || p.getLocation().distanceSquared(senderLoc) > finalRadius * finalRadius)) continue;
 
-                                mentionedPlayers.add(p);
-                            }
+                            mentionedPlayers.add(p);
+                        }
 
                             String formatEveryone = plugin.getConfig().getString("mentions.format-everyone", "<gradient:#FF5555:#FFAA00><b>@%alias%</b></gradient>");
                             m.appendReplacement(sb, formatEveryone.replace("%alias%", name));
@@ -268,6 +271,9 @@ public class ChatListener implements Listener {
                             target = null;
                         }
                         else if (plugin.hasTagsDisabled(target.getUniqueId())) {
+                            target = null;
+                        }
+                        else if (plugin.isWorldDisabled(target.getWorld().getName())) {
                             target = null;
                         }
                     }
@@ -308,6 +314,7 @@ public class ChatListener implements Listener {
         format = format.replace("%player_name%", player.getName());
 
         if (Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) format = PlaceholderAPI.setPlaceholders(player, format);
+        format = stripPlayerHoverClick(format);
 
         String hoverText = plugin.getConfig().getString("colors.hover.player-hover", "<gray>Инфо</gray>").replace("{player}", player.getName());
         if (Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) hoverText = PlaceholderAPI.setPlaceholders(player, hoverText);
@@ -318,21 +325,39 @@ public class ChatListener implements Listener {
 
         // Создаём компонент игрока: голова + имя с hover/click
         // Пытаемся получить кастомный скин из CMI
-        String cmiTexture = me.lovelace.advancedChat.depends.CMISkinUtil.getSkinTextureBase64(player.getUniqueId());
-        Component headComponent;
+        me.lovelace.advancedChat.depends.CMISkinUtil.SkinProperty skinProp =
+                me.lovelace.advancedChat.depends.CMISkinUtil.getSkinProperty(player);
+        String skinSignature = skinProp != null ? skinProp.signature() : null;
+        Component headComponent = HeadComponentUtil.createHeadComponent(
+                player.getUniqueId(),
+                player.getName(),
+                skinProp != null ? skinProp.value() : null,
+                skinSignature
+        );
 
-        if (cmiTexture != null && !cmiTexture.isEmpty()) {
-            // Используем кастомный скин из CMI через NBT-текстуру
-            String headJson = "{\"text\":\"\",\"extra\":[{\"text\":\"\",\"type\":\"minecraft:player\",\"id\":\"" + player.getUniqueId().toString() + "\",\"properties\":[{\"name\":\"textures\",\"value\":\"" + cmiTexture + "\"}]}]}";
+        if (headComponent == null && skinProp != null && skinProp.value() != null && !skinProp.value().isEmpty()) {
+            String propertiesJson;
+            if (skinProp.signature() != null && !skinProp.signature().isEmpty()) {
+                propertiesJson = "\"properties\":[{\"name\":\"textures\",\"value\":\"" + skinProp.value()
+                        + "\",\"signature\":\"" + skinProp.signature() + "\"}]";
+            } else {
+                propertiesJson = "\"properties\":[{\"name\":\"textures\",\"value\":\"" + skinProp.value() + "\"}]";
+            }
+            String fakeUuid = HeadComponentUtil.makeSkinUuid(player.getName()).toString();
+            String fakeName = HeadComponentUtil.makeSkinName(player.getName());
+            String headJson = "{\"text\":\"\",\"extra\":[{\"text\":\"\",\"type\":\"minecraft:player\",\"id\":\""
+                    + fakeUuid
+                    + "\",\"name\":\"" + fakeName + "\"," + propertiesJson + "}]}";
             headComponent = GsonComponentSerializer.gson().deserialize(headJson);
-        } else {
-            // Стандартная голова через Minecraft профиль
-            String headJson = "{\"text\":\"\",\"extra\":[{\"text\":\"\",\"type\":\"minecraft:player\",\"id\":\"" + player.getUniqueId().toString() + "\"}]}";
+        } else if (headComponent == null) {
+            String headJson = "{\"text\":\"\",\"extra\":[{\"text\":\"\",\"type\":\"minecraft:player\",\"id\":\""
+                    + player.getUniqueId().toString()
+                    + "\",\"name\":\"" + player.getName() + "\"}]}";
             headComponent = GsonComponentSerializer.gson().deserialize(headJson);
         }
 
         // Имя игрока (используем просто имя, а не displayName)
-        Component playerNameDisplay = Component.text(player.getName());
+        Component playerNameDisplay = Component.text(player.getName()).font(Key.key("minecraft:default"));
 
         // Полный компонент: голова + пробел + имя с hover/click
         Component playerComponent = Component.empty()
@@ -401,6 +426,9 @@ public class ChatListener implements Listener {
         String buttons = editPrefix + delPrefix;
 
         for (Player p : Bukkit.getOnlinePlayers()) {
+            if (plugin.isWorldDisabled(p.getWorld().getName())) {
+                continue;
+            }
 
             // Игроки без пермиссиона не должны видеть сообщения из админ-канала
             if (isAdminChannel && !p.hasPermission("advancedchat.admin")) {
@@ -451,9 +479,20 @@ public class ChatListener implements Listener {
         });
     }
 
+    private static String stripPlayerHoverClick(String format) {
+        if (format == null || format.isEmpty()) return format;
+        String out = format;
+        out = out.replaceAll("(?is)<hover:[^>]*>\\s*<click:[^>]*>\\s*<player>\\s*</click>\\s*</hover>", "<player>");
+        out = out.replaceAll("(?is)<click:[^>]*>\\s*<hover:[^>]*>\\s*<player>\\s*</hover>\\s*</click>", "<player>");
+        out = out.replaceAll("(?is)<hover:[^>]*>\\s*<player>\\s*</hover>", "<player>");
+        out = out.replaceAll("(?is)<click:[^>]*>\\s*<player>\\s*</click>", "<player>");
+        return out;
+    }
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onCommandPreprocess(PlayerCommandPreprocessEvent event) {
         Player player = event.getPlayer();
+        if (plugin.isWorldDisabled(player.getWorld().getName())) return;
         String cmd = event.getMessage().toLowerCase();
 
         if (cmd.equals("/medit cancel") || cmd.equals("/cancel")) return;
