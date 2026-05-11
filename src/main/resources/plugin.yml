@@ -45,7 +45,17 @@ permissions:
     default: true
   advancedchat.delete.own:
     default: true
+  advancedchat.delete:
+    default: true
+  advancedchat.delete.others:
+    default: op
   advancedchat.delete.admin:
+    default: op
+  advancedchat.edit:
+    default: true
+  advancedchat.edit.others:
+    default: op
+  advancedchat.edit.admin:
     default: op
   advancedchat.mention:
     default: true

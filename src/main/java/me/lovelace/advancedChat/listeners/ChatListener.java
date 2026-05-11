@@ -80,12 +80,14 @@ public class ChatListener implements Listener {
         chatBubbleManager.removeBubble(uuid);
     }
 
-    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     @SuppressWarnings("unused")
     public void onModernChat(@NotNull AsyncChatEvent event) {
         Player player = event.getPlayer();
         if (plugin.isWorldDisabled(player.getWorld().getName())) return;
-        String rawMessage = PlainTextComponentSerializer.plainText().serialize(event.message());
+        Component incomingMessageComponent = event.message();
+        String rawMessage = PlainTextComponentSerializer.plainText().serialize(incomingMessageComponent);
+        boolean useIncomingComponent = !isPlainTextComponent(incomingMessageComponent, rawMessage);
 
         AdvancedChat.EditSession session = plugin.getEditSession(player.getUniqueId());
         if (session != null) {
@@ -95,13 +97,12 @@ public class ChatListener implements Listener {
                 plugin.sendMessage(player, "edit-cancelled-click");
                 return;
             }
-            plugin.editMessageVisual(session.messageId(), rawMessage, player);
+            plugin.editMessageVisual(session.messageId(), rawMessage, incomingMessageComponent, player);
             plugin.removeEditSession(player.getUniqueId());
             return;
         }
 
         event.setCancelled(true);
-        event.viewers().clear();
 
         ConfigurationSection channels = plugin.getConfig().getConfigurationSection("colors.channels");
         String activeChannel = plugin.getDefaultChannel(player.getUniqueId());
@@ -112,17 +113,20 @@ public class ChatListener implements Listener {
                 if (!prefix.isEmpty() && rawMessage.startsWith(prefix)) {
                     activeChannel = key;
                     rawMessage = rawMessage.substring(prefix.length()).trim();
+                    incomingMessageComponent = Component.text(rawMessage);
+                    useIncomingComponent = false;
                     break;
                 }
             }
         }
 
-        AdvancedChatMessageEvent apiEvent = new AdvancedChatMessageEvent(player, rawMessage, activeChannel);
+        AdvancedChatMessageEvent apiEvent = new AdvancedChatMessageEvent(player, rawMessage, incomingMessageComponent, activeChannel);
         Bukkit.getPluginManager().callEvent(apiEvent);
         if (apiEvent.isCancelled()) return;
 
         String message = apiEvent.getMessage();
         activeChannel = apiEvent.getChannel();
+        boolean useApiComponent = apiEvent.hasMessageComponentChanged() || (useIncomingComponent && message.equals(rawMessage));
 
         int radius = channels != null ? channels.getInt(activeChannel + ".radius", 200) : 200;
         if (activeChannel != null && plugin.getCustomChannels().containsKey(activeChannel)) {
@@ -175,7 +179,9 @@ public class ChatListener implements Listener {
         Location senderLoc = player.getLocation();
         int finalRadius = radius;
 
-        if (plugin.getConfig().getBoolean("chat.chat-json", true) && player.hasPermission(plugin.getConfig().getString("chat.permission", "advancedchat.json"))
+        if (useApiComponent) {
+            contentComponent = apiEvent.getMessageComponent();
+        } else if (plugin.getConfig().getBoolean("chat.chat-json", true) && player.hasPermission(plugin.getConfig().getString("chat.permission", "advancedchat.json"))
                 && message.trim().startsWith("{") && message.trim().endsWith("}")) {
             try {
                 contentComponent = GsonComponentSerializer.gson().deserialize(message);
@@ -491,6 +497,10 @@ public class ChatListener implements Listener {
         out = out.replaceAll("(?is)<hover:[^>]*>\\s*<player>\\s*</hover>", "<player>");
         out = out.replaceAll("(?is)<click:[^>]*>\\s*<player>\\s*</click>", "<player>");
         return out;
+    }
+
+    private static boolean isPlainTextComponent(@NotNull Component component, @NotNull String plainText) {
+        return Component.text(plainText).equals(component);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)

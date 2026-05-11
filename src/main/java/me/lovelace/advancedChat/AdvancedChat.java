@@ -360,11 +360,23 @@ public final class AdvancedChat extends JavaPlugin {
     }
 
     public void editMessageVisual(int messageId, String newText, Player editor) {
+        editMessageVisual(messageId, newText, Component.text(newText), editor);
+    }
+
+    public void editMessageVisual(int messageId, String newText, Component newTextComponent, Player editor) {
         MessageData data = getMessageDataCache().getIfPresent(messageId);
         if (data == null) return;
 
+        boolean useIncomingComponent = !Component.text(newText).equals(newTextComponent);
         me.lovelace.advancedChat.api.AdvancedChatAPI.AdvancedChatMessageEditEvent editEvent =
-                new me.lovelace.advancedChat.api.AdvancedChatAPI.AdvancedChatMessageEditEvent(editor, messageId, data.rawText(), newText);
+                new me.lovelace.advancedChat.api.AdvancedChatAPI.AdvancedChatMessageEditEvent(
+                        editor,
+                        messageId,
+                        data.rawText(),
+                        Component.text(data.rawText()),
+                        newText,
+                        newTextComponent
+                );
         Bukkit.getPluginManager().callEvent(editEvent);
 
         if (editEvent.isCancelled()) {
@@ -373,6 +385,10 @@ public final class AdvancedChat extends JavaPlugin {
         }
 
         String finalText = editEvent.getNewMessage();
+        Component finalMessageComponent = null;
+        if (editEvent.hasNewMessageComponentChanged() || (useIncomingComponent && finalText.equals(newText))) {
+            finalMessageComponent = editEvent.getNewMessageComponent();
+        }
         databaseManager.updateMessage(messageId, finalText);
         getMessageDataCache().put(messageId, new MessageData(data.owner(), data.channel(), finalText, data.isStaff()));
 
@@ -388,7 +404,7 @@ public final class AdvancedChat extends JavaPlugin {
         }
         format = stripPlayerHoverClick(format);
 
-        if (!editor.hasPermission("advancedchat.color")) {
+        if (finalMessageComponent == null && !editor.hasPermission("advancedchat.color")) {
             finalText = MiniMessage.miniMessage().escapeTags(finalText);
         }
 
@@ -461,9 +477,13 @@ public final class AdvancedChat extends JavaPlugin {
         // Убираем <delete_edit_buttons> из формата
         format = format.replace("<delete_edit_buttons>", "");
 
+        Component messageComponent = finalMessageComponent != null
+                ? finalMessageComponent
+                : MiniMessage.miniMessage().deserialize(finalText);
+
         Component baseComponent = MiniMessage.miniMessage().deserialize(format + editedMark,
                 Placeholder.component("player", interactivePlayer),
-                Placeholder.component("message", MiniMessage.miniMessage().deserialize(finalText))
+                Placeholder.component("message", messageComponent)
         );
 
         UUID ownerUuid = data.owner();

@@ -7,6 +7,7 @@ import me.lovelace.advancedChat.managers.PinnedMessageManager;
 import me.lovelace.advancedChat.managers.PollManager;
 import me.lovelace.advancedChat.depends.CMISkinUtil;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
@@ -714,23 +715,44 @@ public class AdvancedChatAPI {
         private final Player player;
         private final int messageId;
         private final String oldMessage;
+        private final Component oldMessageComponent;
         private String newMessage;
+        private Component newMessageComponent;
+        private boolean newMessageComponentChanged;
         private boolean cancelled;
 
         public AdvancedChatMessageEditEvent(Player player, int messageId, String oldMessage, String newMessage) {
+            this(player, messageId, oldMessage, Component.text(oldMessage), newMessage, Component.text(newMessage));
+        }
+
+        public AdvancedChatMessageEditEvent(Player player, int messageId, String oldMessage, Component oldMessageComponent, String newMessage, Component newMessageComponent) {
             super(true);
             this.player = player;
             this.messageId = messageId;
             this.oldMessage = oldMessage;
+            this.oldMessageComponent = oldMessageComponent;
             this.newMessage = newMessage;
+            this.newMessageComponent = newMessageComponent;
         }
 
         public Player getPlayer() { return player; }
         public int getMessageId() { return messageId; }
         public String getOldMessage() { return oldMessage; }
+        public Component getOldMessageComponent() { return oldMessageComponent; }
 
         public String getNewMessage() { return newMessage; }
-        public void setNewMessage(String newMessage) { this.newMessage = newMessage; }
+        public void setNewMessage(String newMessage) {
+            this.newMessage = newMessage;
+            this.newMessageComponent = Component.text(newMessage);
+            this.newMessageComponentChanged = false;
+        }
+        public Component getNewMessageComponent() { return newMessageComponent; }
+        public void setNewMessageComponent(Component newMessageComponent) {
+            this.newMessageComponent = newMessageComponent;
+            this.newMessage = PlainTextComponentSerializer.plainText().serialize(newMessageComponent);
+            this.newMessageComponentChanged = true;
+        }
+        public boolean hasNewMessageComponentChanged() { return newMessageComponentChanged; }
 
         @Override public boolean isCancelled() { return cancelled; }
         @Override public void setCancelled(boolean cancel) { this.cancelled = cancel; }
@@ -743,19 +765,37 @@ public class AdvancedChatAPI {
         private static final HandlerList HANDLERS = new HandlerList();
         private final Player player;
         private String message;
+        private Component messageComponent;
         private String channel;
+        private boolean messageComponentChanged;
         private boolean cancelled;
 
         public AdvancedChatMessageEvent(Player player, String message, String channel) {
+            this(player, message, Component.text(message), channel);
+        }
+
+        public AdvancedChatMessageEvent(Player player, String message, Component messageComponent, String channel) {
             super(true);
             this.player = player;
             this.message = message;
+            this.messageComponent = messageComponent;
             this.channel = channel;
         }
 
         public Player getPlayer() { return player; }
         public String getMessage() { return message; }
-        public void setMessage(String message) { this.message = message; }
+        public void setMessage(String message) {
+            this.message = message;
+            this.messageComponent = Component.text(message);
+            this.messageComponentChanged = false;
+        }
+        public Component getMessageComponent() { return messageComponent; }
+        public void setMessageComponent(Component messageComponent) {
+            this.messageComponent = messageComponent;
+            this.message = PlainTextComponentSerializer.plainText().serialize(messageComponent);
+            this.messageComponentChanged = true;
+        }
+        public boolean hasMessageComponentChanged() { return messageComponentChanged; }
         public String getChannel() { return channel; }
         public void setChannel(String channel) { this.channel = channel; }
 
